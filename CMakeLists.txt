@@ -7,7 +7,7 @@ set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-#set (CMAKE_CXX_FLAGS "-fsanitize=address")
+set (CMAKE_CXX_FLAGS "-fsanitize=address")
 
 find_package(GMSH REQUIRED)
 set(LINK_LIBS ${LINK_LIBS} GMSH)
@@ -15,7 +15,7 @@ set(LINK_LIBS ${LINK_LIBS} GMSH)
 find_package(SILO REQUIRED)
 set(LINK_LIBS ${LINK_LIBS} SILO)
 
-set(SOURCES main.cpp input_gmsh.cpp)
+set(SOURCES main.cpp geom_mesh.cpp input_gmsh.cpp output_silo.cpp)
 
 add_executable(mommy ${SOURCES})
 

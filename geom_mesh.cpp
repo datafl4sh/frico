@@ -19,12 +19,60 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include <cmath>
 
 #include "geom_mesh.h"
 
 namespace mommy {
 
-void load_mesh_from_gmsh(mesh& msh);
+std::array<point, 2>
+points(const mesh& msh, const edge& e)
+{
+    return {
+        msh.vertices[e.iv0],
+        msh.vertices[e.iv1]
+    };
+}
+
+point
+barycenter(const mesh& msh, const edge& e)
+{
+    auto pts = points(msh, e);
+    return (pts[0] + pts[1])/2.0;
+}
+
+double
+measure(const mesh& msh, const edge& e)
+{
+    auto pts = points(msh, e);
+    auto d = pts[1] - pts[0];
+    return std::hypot(d.x(), d.y());
+}
+
+std::array<point, 3>
+points(const mesh& msh, const triangle& t)
+{
+    return {
+        msh.vertices[t.iv0],
+        msh.vertices[t.iv1],
+        msh.vertices[t.iv2]
+    };
+}
+
+point
+barycenter(const mesh& msh, const triangle& t)
+{
+    auto pts = points(msh, t);
+    return (pts[0] + pts[1] + pts[2])/3.0;
+}
+
+double
+measure(const mesh& msh, const triangle& t)
+{
+    auto pts = points(msh, t);
+    auto e0 = pts[1] - pts[0];
+    auto e1 = pts[2] - pts[1];
+    return 0.5*norm(cross(e0,e1));
+}
 
 } // namespace mommy

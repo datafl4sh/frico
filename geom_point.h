@@ -22,94 +22,112 @@
 #pragma once
 
 #include <iostream>
+#include <cmath>
 
 namespace mommy {
 
-class point
+class vec3
 {
     double x_;
     double y_;
     double z_;
 
 public:
-    point()
+    vec3()
         : x_(0.0), y_(0.0), z_(0.0)
     {}
 
-    point(double x, double y, double z)
+    vec3(double x, double y, double z)
         : x_(x), y_(y), z_(z)
     {}
 
-    point(const point& other) = default;
+    vec3(const vec3& other) = default;
 
     inline double x() const { return x_; }
     inline double y() const { return y_; }
     inline double z() const { return z_; }
 
-    inline point operator-() const {
-        return point(-x_, -y_, -z_);
+    inline vec3 operator-() const {
+        return vec3(-x_, -y_, -z_);
     }
 
-    inline point& operator+=(const point& other) {
+    inline vec3& operator+=(const vec3& other) {
         x_ += other.x_;
         y_ += other.y_;
         z_ += other.z_;
         return *this;
     }
 
-    inline point operator+(const point& other) const {
-        point ret = *this;
+    inline vec3 operator+(const vec3& other) const {
+        vec3 ret = *this;
         ret += other;
         return ret;
     }
 
-    point& operator-=(const point& other) {
+    vec3& operator-=(const vec3& other) {
         (*this) += -other;
         return *this;
     }
 
-    point operator-(const point& other) const {
+    vec3 operator-(const vec3& other) const {
         return (*this) + (-other);
     }
 
-    point& operator*=(double s) {
+    vec3& operator*=(double s) {
         x_ *= s;
         y_ *= s;
         z_ *= s;
         return *this;
     }
 
-    point operator*(double s) const {
-        point ret = *this;
+    vec3 operator*(double s) const {
+        vec3 ret = *this;
         ret *= s;
         return ret;
     }
 
-    point& operator/=(double s) {
+    vec3& operator/=(double s) {
         x_ /= s;
         y_ /= s;
         z_ /= s;
         return *this;
     }
 
-    point operator/(double s) const {
-        point ret = *this;
+    vec3 operator/(double s) const {
+        vec3 ret = *this;
         ret /= s;
         return ret;
     }
 };
 
-inline point
-operator*(double s, const point& p) {
+inline vec3
+operator*(double s, const vec3& p) {
     return p*s;
 }
 
+inline vec3
+cross(const vec3& a, const vec3& b)
+{
+    return {
+        a.y()*b.z() - a.z()*b.y(),
+        a.z()*b.x() - a.x()*b.z(),
+        a.x()*b.y() - a.y()*b.x()
+    };
+}
+
+inline double
+norm(const vec3& v)
+{
+    return std::sqrt( v.x()*v.x() + v.y()*v.y() + v.z()*v.z() );
+}
+
 inline std::ostream&
-operator<<(std::ostream& os, const point& p)
+operator<<(std::ostream& os, const vec3& p)
 {
     os << "(" << p.x() << ", " << p.y() << ", " << p.z() << ")";
     return os;
 }
 
+using point = vec3;
 
-}
+} // namespace mommy

@@ -1,63 +1,31 @@
-#include <iostream>
+/*
+ * MoMmy - My experimental Method of Moments code
+ *
+ * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
+ * Politecnico di Torino
+ * Dipartimento di Scienze Matematiche "G. L. Lagrange"
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-#include "silo.h"
+#include <iostream>
 
 #include "gmsh.h"
 
 #include "geom_mesh.h"
 #include "input_gmsh.h"
-
-void
-export_mesh(const mommy::mesh& msh)
-{
-    DBfile *db;
-    db = DBCreate("test.silo", DB_CLOBBER, DB_LOCAL, NULL, DB_PDB);
-
-    std::vector<double> x_coords, y_coords, z_coords;
-        x_coords.reserve(msh.vertices.size());
-        y_coords.reserve(msh.vertices.size());
-
-        for (auto& vtx : msh.vertices) {
-            x_coords.push_back( vtx.x() );
-            y_coords.push_back( vtx.y() );
-            z_coords.push_back( vtx.z() );
-        }
-
-        double *coords[] = {x_coords.data(), y_coords.data(), z_coords.data() };
-
-        std::vector<int> nodelist;
-        nodelist.reserve( 3*msh.triangles.size() );
-
-        for (auto& t : msh.triangles)
-        {
-            nodelist.push_back( t.iv0 + 1 );
-            nodelist.push_back( t.iv1 + 1 );
-            nodelist.push_back( t.iv2 + 1 );
-        }
-
-        int lnodelist = nodelist.size();
-
-        int shapetype[] = { DB_ZONETYPE_TRIANGLE };
-        int shapesize[] = {3};
-        int shapecounts[] = { static_cast<int>(msh.triangles.size()) };
-        int nshapetypes = 1;
-        int nnodes = msh.vertices.size();
-        int nzones = msh.triangles.size();
-        int ndims = 3;
-
-        if ( DBPutZonelist2(db, "zonelist", nzones, ndims,
-            nodelist.data(), lnodelist, 1, 0, 0, shapetype, shapesize,
-            shapecounts, nshapetypes, NULL) < 0 ) {
-            std::cout << "DBPutZoneList2() failed" << std::endl;
-        }
-
-        if ( DBPutUcdmesh(db, "mesh", ndims, NULL, coords, nnodes,
-             nzones, "zonelist", NULL, DB_DOUBLE, NULL) < 0 ) {
-            std::cout << "DBPutUcdmesh() failed" << std::endl;
-        }
-
-    DBClose(db);
-}
+#include "output_silo.h"
 
 int main(int argc, char **argv)
 {
@@ -81,12 +49,24 @@ int main(int argc, char **argv)
 
     mommy::mesh msh;
     mommy::load_mesh_from_gmsh(msh);
-
     gmsh::finalize();
 
     std::cout << msh.vertices.size() << " " << msh.triangles.size() << std::endl;
 
-    export_mesh(msh);
+    mommy::silo db("test.silo");
+    db.add_mesh("mesh", msh);
+
+    double l = 0.0;
+    for (auto& be : msh.boundary_edges) {
+        l += measure(msh, be);
+    }
+    std::cout << l << std::endl;
+
+    double a = 0.0;
+    for (auto& t : msh.triangles) {
+        a += measure(msh, t);
+    }
+    std::cout << a << std::endl;
 
     return 0;
 }

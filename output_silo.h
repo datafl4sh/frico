@@ -21,10 +21,32 @@
 
 #pragma once
 
+#include <string>
+
 #include "geom_mesh.h"
+#include "silo.h"
 
 namespace mommy {
 
-void load_mesh_from_gmsh(mesh& msh);
+class silo {
+    DBfile *db_;
+
+public:
+                silo();
+    explicit    silo(const std::string&);
+    explicit    silo(const char *);
+
+                silo(const silo&) = delete;
+    silo& operator=(const silo&) = delete;
+
+    bool open(const std::string&);
+    bool open(const char *);
+    bool is_open() const;
+    void close();
+
+    bool add_mesh(const std::string& name, const mesh& msh);
+
+    ~silo();
+};
 
 } // namespace mommy
