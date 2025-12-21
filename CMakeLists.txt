@@ -15,7 +15,10 @@ set(LINK_LIBS ${LINK_LIBS} GMSH)
 find_package(SILO REQUIRED)
 set(LINK_LIBS ${LINK_LIBS} SILO)
 
-set(SOURCES main.cpp geom_mesh.cpp input_gmsh.cpp output_silo.cpp)
+find_package(Eigen3 REQUIRED)
+set(LINK_LIBS ${LINK_LIBS} Eigen3::Eigen)
+
+set(SOURCES main.cpp geom_mesh.cpp input_gmsh.cpp output_silo.cpp quadratures.cpp)
 
 add_executable(mommy ${SOURCES})
 

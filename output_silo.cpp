@@ -19,6 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cassert>
 #include "output_silo.h"
 
 namespace mommy {
@@ -128,6 +129,97 @@ silo::add_mesh(const std::string& name, const mesh& msh)
         std::cerr << "DBPutUcdmesh() failed\n";
         return false;
     }
+
+    return true;
+}
+
+bool
+silo::add_variable(const std::string& mesh_name,
+    const std::string& var_name,
+    const std::vector<double>& var,
+    var_centering centering)
+{
+    if (not db_) {
+        std::cerr << "add_variable(): Database not opened.\n";
+        return false;
+    }
+
+    if (centering == var_centering::zonal) {
+        DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
+           var.data(), var.size(), NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL);
+        return true;
+    }
+
+    if (centering == var_centering::nodal) {
+        DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
+           var.data(), var.size(), NULL, 0, DB_DOUBLE, DB_NODECENT, NULL);
+        return true;
+    }
+
+    assert(false && "Shouldn't have arrived here: invalid var centering");
+    return false;
+}
+
+bool
+silo::add_variable(const std::string& mesh_name,
+    const std::string& var_name,
+    Eigen::Matrix<double, Eigen::Dynamic, 1>& var,
+    var_centering centering)
+{
+    if (not db_) {
+        std::cerr << "add_variable(): Database not opened.\n";
+        return false;
+    }
+
+    if (centering == var_centering::zonal) {
+        DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
+           var.data(), var.size(), NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL);
+        return true;
+    }
+
+    if (centering == var_centering::nodal) {
+        DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
+           var.data(), var.size(), NULL, 0, DB_DOUBLE, DB_NODECENT, NULL);
+        return true;
+    }
+
+    assert(false && "Shouldn't have arrived here: invalid var centering");
+    return false;
+}
+
+bool
+silo::add_variable(const std::string& mesh_name,
+    const std::string& var_name,
+    Eigen::Matrix<double, Eigen::Dynamic, 3>& var,
+    var_centering centering)
+{
+    Eigen::VectorXd var_x = var.col(0);
+    std::string vname_x = var_name + "_x";
+    bool ok = add_variable(mesh_name, vname_x, var_x, centering);
+    if (not ok) {
+        return false;
+    }
+
+    Eigen::VectorXd var_y = var.col(1);
+    std::string vname_y = var_name + "_y";
+    ok = add_variable(mesh_name, vname_y, var_y, centering);
+    if (not ok) {
+        return false;
+    }
+
+    Eigen::VectorXd var_z = var.col(2);
+    std::string vname_z = var_name + "_z";
+    ok = add_variable(mesh_name, vname_z, var_z, centering);
+    if (not ok) {
+        return false;
+    }
+
+
+    const char *names[] = { var_name.c_str() };
+    std::string def = "{" + vname_x + "," + vname_y + "," + vname_z + "}";
+    const char *defs[] = { def.c_str() };
+    int types[] = { DB_VARTYPE_VECTOR };
+    DBPutDefvars(db_, "defvars", 1, names, types, defs, NULL);
 
     return true;
 }

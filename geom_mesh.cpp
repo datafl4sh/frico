@@ -75,4 +75,15 @@ measure(const mesh& msh, const triangle& t)
     return 0.5*norm(cross(e0,e1));
 }
 
+Eigen::Matrix<double, 3, 1>
+normal(const mesh& msh, const triangle& t)
+{
+    auto pts = points(msh, t);
+    auto e0 = pts[1] - pts[0];
+    auto e1 = pts[2] - pts[1];
+    auto n = cross(e0, e1);
+    n = n/norm(n);
+    return {n.x(), n.y(), n.z()};
+}
+
 } // namespace mommy

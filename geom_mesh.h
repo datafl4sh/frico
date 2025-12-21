@@ -24,6 +24,8 @@
 #include <vector>
 #include <array>
 
+#include <Eigen/Dense>
+
 #include "geom_point.h"
 
 namespace mommy {
@@ -32,6 +34,21 @@ struct edge {
     size_t  iv0;    // offset of first vertex
     size_t  iv1;    // offset of second vertex
     int     tag;    // GMSH tag
+
+    edge() = default;
+    edge(size_t iv0p, size_t iv1p)
+        : iv0(std::min(iv0p, iv1p)), iv1(std::max(iv0p, iv1p))
+    {}
+
+    bool operator<(const edge& other) const {
+        bool a = iv0 < other.iv0;
+        bool b = (iv0 == other.iv0) and (iv1 < other.iv1);
+        return (a or b);
+    }
+
+    bool operator==(const edge& other) const {
+        return (iv0 == other.iv0) and (iv1 == other.iv1);
+    }
 };
 
 inline std::ostream&
@@ -55,6 +72,11 @@ operator<<(std::ostream& os, const triangle& t)
     return os;
 }
 
+struct bedgeptr {
+    size_t  offset;
+    int     tag;
+};
+
 struct mesh {
     std::vector<point>      vertices;
     std::vector<edge>       boundary_edges;
@@ -68,5 +90,7 @@ point barycenter(const mesh&, const edge&);
 point barycenter(const mesh&, const triangle&);
 double measure(const mesh&, const edge&);
 double measure(const mesh&, const triangle&);
+
+Eigen::Matrix<double, 3, 1> normal(const mesh&, const triangle&);
 
 }

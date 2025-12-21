@@ -98,11 +98,21 @@ gmsh_get_triangles(mesh& msh, const std::vector<std::optional<size_t>>& node_tag
 
                 triangle t{node0_ofs, node1_ofs, node2_ofs, tag};
                 msh.triangles.push_back(t);
+
+                msh.edges.push_back( {node0_ofs, node1_ofs} );
+                msh.edges.push_back( {node1_ofs, node2_ofs} );
+                msh.edges.push_back( {node2_ofs, node0_ofs} );
             }
         }
 
         subdom_id++;
     }
+
+    std::sort(msh.edges.begin(), msh.edges.end());
+    msh.edges.erase(
+        std::unique(msh.edges.begin(), msh.edges.end()),
+        msh.edges.end()
+    );
 }
 
 static void
@@ -138,7 +148,8 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
                 assert(node1_tag < node_tag2ofs.size());
                 auto node1_ofs = node_tag2ofs[node1_tag].value(); //must be valid
 
-                edge be{node0_ofs, node1_ofs, tag};
+                edge be{node0_ofs, node1_ofs};
+                be.tag = tag;
                 msh.boundary_edges.push_back(be);
             }
         }

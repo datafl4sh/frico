@@ -23,10 +23,17 @@
 
 #include <string>
 
+#include <Eigen/Dense>
+
 #include "geom_mesh.h"
 #include "silo.h"
 
 namespace mommy {
+
+enum class var_centering {
+    nodal,
+    zonal
+};
 
 class silo {
     DBfile *db_;
@@ -45,6 +52,24 @@ public:
     void close();
 
     bool add_mesh(const std::string& name, const mesh& msh);
+
+    bool add_variable(const std::string& mesh_name,
+        const std::string& var_name,
+        const std::vector<double>& var,
+        var_centering centering
+    );
+
+    bool add_variable(const std::string& mesh_name,
+        const std::string& var_name,
+        Eigen::Matrix<double, Eigen::Dynamic, 1>& var,
+        var_centering centering
+    );
+
+    bool add_variable(const std::string& mesh_name,
+        const std::string& var_name,
+        Eigen::Matrix<double, Eigen::Dynamic, 3>& var,
+        var_centering centering
+    );
 
     ~silo();
 };

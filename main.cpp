@@ -20,12 +20,14 @@
  */
 
 #include <iostream>
+#include <cmath>
 
 #include "gmsh.h"
 
 #include "geom_mesh.h"
 #include "input_gmsh.h"
 #include "output_silo.h"
+#include "quadratures.h"
 
 int main(int argc, char **argv)
 {
@@ -67,6 +69,29 @@ int main(int argc, char **argv)
         a += measure(msh, t);
     }
     std::cout << a << std::endl;
+
+    std::vector<double> test;
+    for (size_t i = 0; i < msh.triangles.size(); i++) {
+        test.push_back(i);
+    }
+
+    db.add_variable("mesh", "test", test, mommy::var_centering::zonal);
+
+    Eigen::VectorXd vals;
+    vals = Eigen::VectorXd::Zero(msh.vertices.size());
+    for (size_t i = 0; i < msh.vertices.size(); i++) {
+        const auto& vtx = msh.vertices[i];
+        auto val = std::sin(M_PI*vtx.x())*std::sin(M_PI*vtx.y());
+        vals(i) = val;
+    }
+    db.add_variable("mesh", "vals", vals, mommy::var_centering::nodal);
+
+    Eigen::Matrix<double, Eigen::Dynamic, 3> norms;
+    norms = Eigen::Matrix<double, Eigen::Dynamic, 3>::Zero(msh.triangles.size(), 3);
+    for (size_t i = 0; i < msh.triangles.size(); i++) {
+        norms.row(i) = normal(msh, msh.triangles[i]);
+    }
+    db.add_variable("mesh", "normals", norms, mommy::var_centering::zonal);
 
     return 0;
 }
