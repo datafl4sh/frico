@@ -60,7 +60,7 @@ int main(int argc, char **argv)
 
     double l = 0.0;
     for (auto& be : msh.boundary_edges) {
-        l += measure(msh, be);
+        l += measure(msh, deref(msh.edges, be));
     }
     std::cout << l << std::endl;
 

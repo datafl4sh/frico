@@ -23,6 +23,7 @@
 
 #include <vector>
 #include <array>
+#include <optional>
 
 #include <Eigen/Dense>
 
@@ -33,7 +34,7 @@ namespace mommy {
 struct edge {
     size_t  iv0;    // offset of first vertex
     size_t  iv1;    // offset of second vertex
-    int     tag;    // GMSH tag
+    //int     tag;    // GMSH tag
 
     edge() = default;
     edge(size_t iv0p, size_t iv1p)
@@ -54,7 +55,7 @@ struct edge {
 inline std::ostream&
 operator<<(std::ostream& os, const edge& e)
 {
-    os << "Edg: (" << e.iv0 << ", " << e.iv1 << "), " << e.tag;
+    os << "Edg: (" << e.iv0 << ", " << e.iv1 << ") ";
     return os;
 }
 
@@ -77,12 +78,31 @@ struct bedgeptr {
     int     tag;
 };
 
+inline edge
+deref(const std::vector<edge>& edges, bedgeptr bep)
+{
+    assert(bep.offset < edges.size());
+    return edges[bep.offset];
+}
+
 struct mesh {
     std::vector<point>      vertices;
-    std::vector<edge>       boundary_edges;
+    std::vector<bedgeptr>   boundary_edges;
     std::vector<edge>       edges;
     std::vector<triangle>   triangles;
 };
+
+template<typename T>
+std::optional<size_t>
+offset(const std::vector<T>& vec, const T& elem)
+{
+    auto itor = std::lower_bound(vec.begin(), vec.end(), elem);
+    if (itor != vec.end() && *itor == elem) {
+        return std::distance(vec.begin(), itor);
+    }
+
+    return {};
+}
 
 std::array<point, 2> points(const mesh&, const edge&);
 std::array<point, 3> points(const mesh&, const triangle&);

@@ -148,9 +148,12 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
                 assert(node1_tag < node_tag2ofs.size());
                 auto node1_ofs = node_tag2ofs[node1_tag].value(); //must be valid
 
-                edge be{node0_ofs, node1_ofs};
-                be.tag = tag;
-                msh.boundary_edges.push_back(be);
+                edge e{node0_ofs, node1_ofs};
+
+                bedgeptr bep;
+                bep.offset = offset(msh.edges, e).value(); // must exist
+                bep.tag = tag;
+                msh.boundary_edges.push_back(bep);
             }
         }
 
@@ -201,9 +204,9 @@ load_mesh_from_gmsh(mesh& msh)
         t.iv2 = used[t.iv2].value();
     }
 
-    for (auto& be : msh.boundary_edges) {
-        be.iv0 = used[be.iv0].value();
-        be.iv1 = used[be.iv1].value();
+    for (auto& e : msh.edges) {
+        e.iv0 = used[e.iv0].value();
+        e.iv1 = used[e.iv1].value();
     }
 }
 
