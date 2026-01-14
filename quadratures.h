@@ -38,4 +38,7 @@ dunavant(size_t, const point&, const point&, const point&);
 std::vector<quadrature_point>
 integrate(const mesh&, const triangle&, size_t degree);
 
+std::vector<quadrature_point>
+integrate_subtri(const mesh&, const triangle&, size_t degree);
+
 } // namespace mommy

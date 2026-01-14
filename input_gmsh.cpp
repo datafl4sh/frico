@@ -86,15 +86,18 @@ gmsh_get_triangles(mesh& msh, const std::vector<std::optional<size_t>>& node_tag
 
                 auto node0_tag = elemNodeTags[base + 0];
                 assert(node0_tag < node_tag2ofs.size());
-                auto node0_ofs = node_tag2ofs[node0_tag].value(); //must be valid
+                assert(node_tag2ofs[node0_tag]);
+                auto node0_ofs = *node_tag2ofs[node0_tag];
 
                 auto node1_tag = elemNodeTags[base + 1];
                 assert(node1_tag < node_tag2ofs.size());
-                auto node1_ofs = node_tag2ofs[node1_tag].value(); //must be valid
+                assert(node_tag2ofs[node1_tag]);
+                auto node1_ofs = *node_tag2ofs[node1_tag];
 
                 auto node2_tag = elemNodeTags[base + 2];
                 assert(node2_tag < node_tag2ofs.size());
-                auto node2_ofs = node_tag2ofs[node2_tag].value(); //must be valid
+                assert(node_tag2ofs[node2_tag]);
+                auto node2_ofs = *node_tag2ofs[node2_tag];
 
                 triangle t{node0_ofs, node1_ofs, node2_ofs, tag};
                 msh.triangles.push_back(t);
@@ -142,22 +145,78 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
 
                 auto node0_tag = elemNodeTags[base + 0];
                 assert(node0_tag < node_tag2ofs.size());
-                auto node0_ofs = node_tag2ofs[node0_tag].value(); //must be valid
+                assert(node_tag2ofs[node0_tag]);
+                auto node0_ofs = *node_tag2ofs[node0_tag];
 
                 auto node1_tag = elemNodeTags[base + 1];
                 assert(node1_tag < node_tag2ofs.size());
-                auto node1_ofs = node_tag2ofs[node1_tag].value(); //must be valid
+                assert(node_tag2ofs[node1_tag]);
+                auto node1_ofs = *node_tag2ofs[node1_tag];
 
                 edge e{node0_ofs, node1_ofs};
 
+                auto opt_ofs = offset(msh.edges, e);
+                assert(opt_ofs);
                 bedgeptr bep;
-                bep.offset = offset(msh.edges, e).value(); // must exist
+                bep.offset = *opt_ofs;
                 bep.tag = tag;
                 msh.boundary_edges.push_back(bep);
             }
         }
 
         subdom_id++;
+    }
+}
+
+std::array<edge, 3>
+edges(const triangle& tri)
+{
+    return {{
+        { tri.iv0, tri.iv1 },
+        { tri.iv1, tri.iv2 },
+        { tri.iv2, tri.iv0 }
+    }};
+}
+
+static void
+compute_connectivity(mesh& msh)
+{
+    std::vector<int> flags(msh.edges.size(), 0);
+
+    msh.edge_neighbours.resize( msh.edges.size() );
+
+    for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+        const auto& tri = msh.triangles[itri];
+        auto edgs = edges(tri);
+        std::array<size_t, 3> ofss;
+        ofss[0] = offset(msh.edges, edgs[0]).value();
+        ofss[1] = offset(msh.edges, edgs[1]).value();
+        ofss[2] = offset(msh.edges, edgs[2]).value();
+
+        for (int iedg = 0; iedg < 3; iedg++) {
+            auto ofs = ofss[iedg];
+            auto& en = msh.edge_neighbours[ofs];
+            assert(not en.itplus);
+            assert(not en.loc_eplus);
+            if (flags[ofs]) {
+                if ( en.itminus < itri) {
+                    en.itplus = itri;
+                    en.loc_eplus = iedg;
+                } else {
+                    en.itplus = en.itminus;
+                    en.itminus = itri;
+                    en.loc_eplus = en.loc_eminus;
+                    en.loc_eminus = iedg;
+                }
+            } else {
+                en.itminus = itri;
+                en.loc_eminus = iedg;
+                flags[ofs] = 1;
+            }
+        
+            // valid(T+) => ( T- < T+ )
+            assert( (not en.itplus) or (en.itminus < en.itplus.value()) );
+        }
     }
 }
 
@@ -192,22 +251,29 @@ load_mesh_from_gmsh(mesh& msh)
     for (size_t i = 0; i < used.size(); i++) {
         const auto& uopt = used[i];
         if (uopt) {
-            vertices[uopt.value()] = msh.vertices[i];
+            vertices[*uopt] = msh.vertices[i];
         }
     }
     std::swap(vertices, msh.vertices);
     vertices.clear();
 
     for (auto& t : msh.triangles) {
-        t.iv0 = used[t.iv0].value();
-        t.iv1 = used[t.iv1].value();
-        t.iv2 = used[t.iv2].value();
+        assert(used[t.iv0]);
+        t.iv0 = *used[t.iv0];
+        assert(used[t.iv1]);
+        t.iv1 = *used[t.iv1];
+        assert(used[t.iv2]);
+        t.iv2 = *used[t.iv2];
     }
 
     for (auto& e : msh.edges) {
-        e.iv0 = used[e.iv0].value();
-        e.iv1 = used[e.iv1].value();
+        assert(used[e.iv0]);
+        e.iv0 = *used[e.iv0];
+        assert(used[e.iv1]);
+        e.iv1 = *used[e.iv1];
     }
+
+    compute_connectivity(msh);
 }
 
 } // namespace mommy

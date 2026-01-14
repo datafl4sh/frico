@@ -19,7 +19,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <algorithm>
 #include <cmath>
+#include <cassert>
 
 #include "geom_mesh.h"
 
@@ -84,6 +86,31 @@ normal(const mesh& msh, const triangle& t)
     auto n = cross(e0, e1);
     n = n/norm(n);
     return {n.x(), n.y(), n.z()};
+}
+
+
+bool
+is_boundary(const mesh& msh, const edge& e)
+{
+    auto opt_ofs = offset(msh.edges, e);
+    assert(opt_ofs);
+    auto ofs = *opt_ofs;
+    assert(ofs < msh.edge_neighbours.size());
+    return (not msh.edge_neighbours[ofs].itplus);
+}
+
+size_t
+num_internal_edges(const mesh& msh)
+{
+    auto pred = [](const neighbours& n) -> bool {
+        // if the optional is valid it is not a boundary edge
+        return bool(n.itplus);
+    };
+
+    auto count = std::count_if( msh.edge_neighbours.begin(),
+        msh.edge_neighbours.end(), pred );
+
+    return count;
 }
 
 } // namespace mommy

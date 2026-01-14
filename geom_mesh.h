@@ -34,7 +34,6 @@ namespace mommy {
 struct edge {
     size_t  iv0;    // offset of first vertex
     size_t  iv1;    // offset of second vertex
-    //int     tag;    // GMSH tag
 
     edge() = default;
     edge(size_t iv0p, size_t iv1p)
@@ -42,12 +41,16 @@ struct edge {
     {}
 
     bool operator<(const edge& other) const {
+        assert(iv0 < iv1);
+        assert(other.iv0 < other.iv1);
         bool a = iv0 < other.iv0;
         bool b = (iv0 == other.iv0) and (iv1 < other.iv1);
         return (a or b);
     }
 
     bool operator==(const edge& other) const {
+        assert(iv0 < iv1);
+        assert(other.iv0 < other.iv1);
         return (iv0 == other.iv0) and (iv1 == other.iv1);
     }
 };
@@ -85,11 +88,18 @@ deref(const std::vector<edge>& edges, bedgeptr bep)
     return edges[bep.offset];
 }
 
+struct neighbours {
+    size_t                  itminus;    // T- index
+    size_t                  loc_eminus; // Local edge number in T-
+    std::optional<size_t>   itplus;     // T+ index
+    std::optional<size_t>   loc_eplus;  // Local edge number in T+
+};
 struct mesh {
-    std::vector<point>      vertices;
-    std::vector<bedgeptr>   boundary_edges;
-    std::vector<edge>       edges;
-    std::vector<triangle>   triangles;
+    std::vector<point>          vertices;
+    std::vector<bedgeptr>       boundary_edges;
+    std::vector<edge>           edges;
+    std::vector<triangle>       triangles;
+    std::vector<neighbours>     edge_neighbours;
 };
 
 template<typename T>
@@ -110,6 +120,8 @@ point barycenter(const mesh&, const edge&);
 point barycenter(const mesh&, const triangle&);
 double measure(const mesh&, const edge&);
 double measure(const mesh&, const triangle&);
+bool is_boundary(const mesh&, const edge&);
+size_t num_internal_edges(const mesh&);
 
 Eigen::Matrix<double, 3, 1> normal(const mesh&, const triangle&);
 

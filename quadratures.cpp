@@ -378,6 +378,25 @@ integrate(const mesh& msh, const triangle& t, size_t degree)
     return dunavant(degree, pts[0], pts[1], pts[2]);
 }
 
+std::vector<quadrature_point>
+integrate_subtri(const mesh& msh, const triangle& t, size_t degree)
+{
+    auto pts = points(msh, t);
+    auto bar = barycenter(msh, t);
+    
+    std::vector<quadrature_point> ret =
+        dunavant(degree, pts[0], pts[1], bar);
+    
+    std::vector<quadrature_point> q =
+        dunavant(degree, pts[1], pts[2], bar);
+    ret.insert(ret.end(), q.begin(), q.end());
+
+    q = dunavant(degree, pts[2], pts[0], bar);
+    ret.insert(ret.end(), q.begin(), q.end());
+
+    return ret;
+}
+
 #if 0
 /************ GAUSS ************/
 // The quadrature tables were stolen shamelessy from https://github.com/fvicini/gedim/

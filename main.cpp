@@ -21,6 +21,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <fstream>
 
 #include "gmsh.h"
 
@@ -28,6 +29,71 @@
 #include "input_gmsh.h"
 #include "output_silo.h"
 #include "quadratures.h"
+
+namespace mommy {
+
+struct basis_function
+{
+    double  Aminus;
+    double  Aplus;
+    size_t  itminus;
+    size_t  itplus;
+    point   pminus;
+    point   pplus;
+    std::vector<quadrature_point>   qminus;
+    std::vector<quadrature_point>   qplus;
+    double  length;
+    size_t  edge_index;
+    size_t  matrix_index;
+};
+
+std::ostream&
+operator<<(std::ostream& os, const basis_function& bf)
+{
+    os << bf.edge_index << " " << bf.matrix_index << " " << bf.itminus;
+    os << " " << bf.itplus;
+    return os;
+}
+
+void populate_data(const mesh& msh, std::vector<basis_function>& bfs)
+{
+    bfs.reserve( num_internal_edges(msh) );
+    size_t matrix_index = 0;
+    for (size_t iedg = 0; iedg < msh.edge_neighbours.size(); iedg++) {
+        const auto& en = msh.edge_neighbours[iedg];
+        if (not en.itplus) {
+            continue; // it is a boundary edge
+        }
+
+        size_t integration_degree = 4;
+
+        auto Tminus = msh.triangles[en.itminus];
+        auto Tplus  = msh.triangles[en.itplus.value()];
+
+        std::array<size_t, 3> ivtminus {Tminus.iv0, Tminus.iv1, Tminus.iv2};
+        std::array<size_t, 3> ivtplus {Tplus.iv0, Tplus.iv1, Tplus.iv2};
+
+        std::array<size_t, 3> lvmap {2, 0, 1};
+        size_t ipminus = ivtminus[lvmap[en.loc_eminus]];
+        size_t ipplus = ivtplus[lvmap[en.loc_eplus.value()]];
+
+        basis_function bf;
+        bf.Aminus = measure(msh, Tminus);
+        bf.Aplus = measure(msh, Tplus);
+        bf.itminus = en.itminus;
+        bf.itplus = en.itplus.value();
+        bf.pminus = msh.vertices[ipminus];
+        bf.pplus = msh.vertices[ipplus];
+        bf.qminus = integrate(msh, Tminus, integration_degree);
+        bf.qplus = integrate(msh, Tplus, integration_degree);
+        bf.length = measure(msh, msh.edges[iedg]);
+        bf.edge_index = iedg;
+        bf.matrix_index = matrix_index++;
+        bfs.push_back(bf);
+    }
+}
+
+} //namespace mommy
 
 int main(int argc, char **argv)
 {
@@ -93,5 +159,36 @@ int main(int argc, char **argv)
     }
     db.add_variable("mesh", "normals", norms, mommy::var_centering::zonal);
 
+    std::cout << "Vertices: " << msh.vertices.size() << std::endl;
+    std::cout << "Edges:    " << msh.edges.size() << std::endl;
+    std::cout << "Cells:    " << msh.triangles.size() << std::endl;
+    std::cout << "IntEdges: " << mommy::num_internal_edges(msh) << std::endl;
+
+    std::vector<mommy::basis_function> bfs;
+    mommy::populate_data(msh, bfs);
+
+    for (size_t i = 0; i < bfs.size(); i++)
+    {
+        const auto& bf = bfs[i];
+        std::string fname = "debug/basis_" + std::to_string(bf.edge_index) + "_minus.dat";
+        std::ofstream ofs_minus(fname);
+        for (auto& qpsminus : bf.qminus) {
+            auto r = qpsminus.p;
+            auto v = r - bf.pminus;
+            auto rho = bf.length*v/(2.0*bf.Aminus);
+            ofs_minus << r.x() << " " << r.y() << " " << v.x() << " " << v.y() << "\n";
+        }
+
+        fname = "debug/basis_" + std::to_string(bf.edge_index) + "_plus.dat";
+        std::ofstream ofs_plus(fname);
+        for (auto& qpsplus : bf.qplus) {
+            auto r = qpsplus.p;
+            auto v = bf.pplus - r;
+            auto rho = bf.length*v/(2.0*bf.Aplus);
+            ofs_plus << r.x() << " " << r.y() << " " << v.x() << " " << v.y() << "\n";
+        }
+    }
+
     return 0;
 }
+
