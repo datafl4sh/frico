@@ -22,6 +22,11 @@
 #include <iostream>
 #include <cmath>
 #include <fstream>
+#include <chrono>
+
+#include <Eigen/Dense>
+
+#include <highfive/H5Easy.hpp>
 
 #include "gmsh.h"
 
@@ -40,12 +45,46 @@ struct basis_function
     size_t  itplus;
     point   pminus;
     point   pplus;
-    std::vector<quadrature_point>   qminus;
-    std::vector<quadrature_point>   qplus;
     double  length;
     size_t  edge_index;
     size_t  matrix_index;
+
+    Eigen::Matrix<double,3,1> eval_minus(const point& r) const;
+    Eigen::Matrix<double,3,1> eval_plus(const point& r) const;
+
+    Eigen::Matrix<double,3,1> vec_minus(const point& r) const;
+    Eigen::Matrix<double,3,1> vec_plus(const point& r) const;
 };
+
+inline Eigen::Matrix<double, 3, 1>
+basis_function::eval_minus(const point& r) const
+{
+    auto v = r - pminus;
+    auto f = length*v/(2.0*Aminus);
+    return { f.x(), f.y(), f.z() };
+}
+
+inline Eigen::Matrix<double, 3, 1>
+basis_function::eval_plus(const point& r) const
+{
+    auto v = pplus - r;
+    auto f = length*v/(2.0*Aplus);
+    return { f.x(), f.y(), f.z() };
+}
+
+inline Eigen::Matrix<double, 3, 1>
+basis_function::vec_minus(const point& r) const
+{
+    auto v = r - pminus;
+    return { v.x(), v.y(), v.z() };
+}
+
+inline Eigen::Matrix<double, 3, 1>
+basis_function::vec_plus(const point& r) const
+{
+    auto v = pplus - r;
+    return { v.x(), v.y(), v.z() };
+}
 
 std::ostream&
 operator<<(std::ostream& os, const basis_function& bf)
@@ -84,13 +123,117 @@ void populate_data(const mesh& msh, std::vector<basis_function>& bfs)
         bf.itplus = en.itplus.value();
         bf.pminus = msh.vertices[ipminus];
         bf.pplus = msh.vertices[ipplus];
-        bf.qminus = integrate(msh, Tminus, integration_degree);
-        bf.qplus = integrate(msh, Tplus, integration_degree);
+        //bf.qminus = integrate(msh, Tminus, integration_degree);
+        //bf.qplus = integrate(msh, Tplus, integration_degree);
         bf.length = measure(msh, msh.edges[iedg]);
         bf.edge_index = iedg;
         bf.matrix_index = matrix_index++;
         bfs.push_back(bf);
     }
+}
+
+int
+num_shared_vertices(const mesh& msh, const size_t eia, const size_t eib)
+{
+    assert(eia < msh.edges.size());
+    assert(eib < msh.edges.size());
+    auto ea = msh.edges[eia];
+    auto eb = msh.edges[eib];
+
+    if ( (ea.iv0 == eb.iv0) and (ea.iv1 == eb.iv1) ) {
+        return 2;
+    }
+
+    if ( (ea.iv0 == eb.iv0) or (ea.iv0 == eb.iv1) or
+         (ea.iv1 == eb.iv0) or (ea.iv1 == eb.iv1) ) {
+        return 1;
+    }
+
+    return 0;
+}
+
+void
+compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
+    Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>& Z)
+{
+    size_t intdeg = 3;
+
+    double wn = 2;
+    double inv_wnsq = 1./(wn*wn);
+
+    for (const auto& ibf : bfs) {
+        const auto& iTminus = msh.triangles[ibf.itminus];
+        const auto& iTplus = msh.triangles[ibf.itplus];
+        auto iqps_minus = integrate(msh, iTminus, intdeg);
+        auto iqps_plus = integrate(msh, iTplus, intdeg);
+
+        for (const auto& jbf : bfs) {
+            const auto& jTminus = msh.triangles[jbf.itminus];
+            const auto& jTplus = msh.triangles[jbf.itplus];
+            bool split = num_shared_vertices(msh, ibf.edge_index, jbf.edge_index) != 0;
+
+            auto jqps_minus = split?
+                integrate_subtri(msh, jTminus, intdeg) :
+                integrate(msh, jTminus, intdeg);
+
+            auto jqps_plus = split?
+                integrate_subtri(msh, jTplus, intdeg) :
+                integrate(msh, jTplus, intdeg);
+
+            std::complex<double> entry = 0.0;
+            double prodl = 0.25 * ibf.length * jbf.length * M_1_PI;
+
+            /* iT-, jT- */
+            for (const auto& iqp : iqps_minus) {
+                for (const auto& jqp : jqps_minus) {
+                    double prodw = iqp.w * jqp.w;
+                    double prod = 0.25*ibf.vec_minus(iqp.p).dot(jbf.vec_minus(jqp.p));
+                    double Rij = norm(iqp.p - jqp.p);
+                    double t = prodw * ( prod + inv_wnsq ) / Rij;
+                    std::complex<double> exponent{0, -wn*Rij};
+                    entry += prodl * t * std::exp(exponent);
+                }
+            }
+
+            /* iT-, jT+ */
+            for (const auto& iqp : iqps_minus) {
+                for (const auto& jqp : jqps_plus) {
+                    double prodw = iqp.w * jqp.w;
+                    double prod = 0.25*ibf.vec_minus(iqp.p).dot(jbf.vec_plus(jqp.p));
+                    double Rij = norm(iqp.p - jqp.p);
+                    double t = prodw * ( prod - inv_wnsq ) / Rij;
+                    std::complex<double> exponent{0, -wn*Rij};
+                    entry += prodl * t * std::exp(exponent);
+                }
+            }
+
+            /* iT+, jT- */
+            for (const auto& iqp : iqps_plus) {
+                for (const auto& jqp : jqps_minus) {
+                    double prodw = iqp.w * jqp.w;
+                    double prod = 0.25*ibf.vec_plus(iqp.p).dot(jbf.vec_minus(jqp.p));
+                    double Rij = norm(iqp.p - jqp.p);
+                    double t = prodw * ( prod - inv_wnsq ) / Rij;
+                    std::complex<double> exponent{0, -wn*Rij};
+                    entry += prodl * t * std::exp(exponent);
+                }
+            }
+
+            /* iT+, jT+ */
+            for (const auto& iqp : iqps_plus) {
+                for (const auto& jqp : jqps_plus) {
+                    double prodw = iqp.w * jqp.w;
+                    double prod = 0.25*ibf.vec_plus(iqp.p).dot(jbf.vec_plus(jqp.p));
+                    double Rij = norm(iqp.p - jqp.p);
+                    double t = prodw * ( prod + inv_wnsq ) / Rij;
+                    std::complex<double> exponent{0, -wn*Rij};
+                    entry += prodl * t * std::exp(exponent);
+                }
+            }
+
+            Z(jbf.matrix_index, ibf.matrix_index) = entry;
+        } // for jbf
+    } // for ibf
 }
 
 } //namespace mommy
@@ -170,24 +313,39 @@ int main(int argc, char **argv)
     for (size_t i = 0; i < bfs.size(); i++)
     {
         const auto& bf = bfs[i];
+
+        auto Tminus = msh.triangles[bf.itminus];
+        auto Tplus  = msh.triangles[bf.itplus];
+
         std::string fname = "debug/basis_" + std::to_string(bf.edge_index) + "_minus.dat";
         std::ofstream ofs_minus(fname);
-        for (auto& qpsminus : bf.qminus) {
-            auto r = qpsminus.p;
-            auto v = r - bf.pminus;
-            auto rho = bf.length*v/(2.0*bf.Aminus);
-            ofs_minus << r.x() << " " << r.y() << " " << v.x() << " " << v.y() << "\n";
+        auto qpsminus = mommy::integrate(msh, Tminus, 8);
+        for (const auto& qp : qpsminus) {
+            auto rho = bf.eval_minus(qp.p);
+            ofs_minus << qp.p.x() << " " << qp.p.y() << " " << rho(0) << " " << rho(1) << "\n";
         }
 
         fname = "debug/basis_" + std::to_string(bf.edge_index) + "_plus.dat";
         std::ofstream ofs_plus(fname);
-        for (auto& qpsplus : bf.qplus) {
-            auto r = qpsplus.p;
-            auto v = bf.pplus - r;
-            auto rho = bf.length*v/(2.0*bf.Aplus);
-            ofs_plus << r.x() << " " << r.y() << " " << v.x() << " " << v.y() << "\n";
+        auto qpsplus = mommy::integrate(msh, Tplus, 8);
+        for (const auto& qp : qpsplus) {
+            auto rho = bf.eval_plus(qp.p);
+            ofs_plus << qp.p.x() << " " << qp.p.y() << " " << rho(0) << " " << rho(1) << "\n";
         }
     }
+
+    auto system_size = mommy::num_internal_edges(msh);
+    using MT = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;
+    MT Z = MT::Zero(system_size, system_size);
+    std::cout << "Assemblying matrix...\n";
+    const auto start{std::chrono::steady_clock::now()};
+    mommy::compute_matrix(msh, bfs, Z);
+    const auto end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> elapsed_seconds{end - start};
+    std::cout << "ASM time: " << elapsed_seconds << " seconds\n";
+
+    H5Easy::File file("mommy.h5", H5Easy::File::Truncate);
+    file.createDataSet("mommy/Z", Z);
 
     return 0;
 }
