@@ -45,7 +45,7 @@ area_triangle_kahan(const point& p0, const point& p1, const point& p2)
     const double l20 = norm(p2 - p0);
     const double l21 = norm(p2 - p1);
 
-    std::array<double, 3> length = {l10, l20, l21};
+    std::array<double, 3> length{l10, l20, l21};
 
     std::sort(length.begin(), length.end());
 

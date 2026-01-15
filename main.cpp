@@ -35,6 +35,8 @@
 #include "output_silo.h"
 #include "quadratures.h"
 
+#define MU0     1.256637061435917e-06
+#define EPS0    8.8541878188e-12
 namespace mommy {
 
 struct basis_function
@@ -48,6 +50,7 @@ struct basis_function
     double  length;
     size_t  edge_index;
     size_t  matrix_index;
+    std::optional<size_t>   interface;
 
     Eigen::Matrix<double,3,1> eval_minus(const point& r) const;
     Eigen::Matrix<double,3,1> eval_plus(const point& r) const;
@@ -124,6 +127,7 @@ void populate_data(const mesh& msh, std::vector<basis_function>& bfs)
         bf.length = measure(msh, msh.edges[iedg]);
         bf.edge_index = iedg;
         bf.matrix_index = matrix_index++;
+        bf.interface = en.interface;
         bfs.push_back(bf);
     }
 }
@@ -152,9 +156,11 @@ void
 compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
     Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>& Z)
 {
-    size_t intdeg = 3;
+    size_t intdeg = 2;
 
-    double wn = 2;
+    double freq = 1200e6;
+    double omega = 2.0*M_PI*freq;
+    double wn = omega*std::sqrt(MU0*EPS0);
     double inv_wnsq = 1./(wn*wn);
 
     for (const auto& ibf : bfs) {
@@ -227,9 +233,41 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                 }
             }
 
-            Z(ibf.matrix_index, jbf.matrix_index) = entry;
+            Z(jbf.matrix_index, ibf.matrix_index) = entry;
         } // for jbf
     } // for ibf
+}
+
+void
+compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
+    Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>& b)
+{
+    size_t intdeg = 2;
+
+    double freq = 1200e6;
+    double omega = 2.0*M_PI*freq;
+    double wn = omega*std::sqrt(MU0*EPS0);
+
+    Eigen::Matrix<std::complex<double>, 3, 1> E{1.0, 0.0, 0.0};
+
+    for (const auto& ibf : bfs) {
+    
+        if (not ibf.interface) {
+            continue;
+        }
+    
+        auto itf_tag = ibf.interface.value();
+        std::cout << "rhs: itf tag " << itf_tag << "\n";
+
+        const auto& iTminus = msh.triangles[ibf.itminus];
+        const auto& iTplus = msh.triangles[ibf.itplus];
+        //auto iqps_minus = integrate(msh, iTminus, intdeg);
+        //auto iqps_plus = integrate(msh, iTplus, intdeg);
+
+        std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
+
+        b(ibf.matrix_index) += entry;
+    }
 }
 
 } //namespace mommy
@@ -331,17 +369,49 @@ int main(int argc, char **argv)
     }
 
     auto system_size = mommy::num_internal_edges(msh);
+    
     using MT = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;
     MT Z = MT::Zero(system_size, system_size);
-    std::cout << "Assemblying matrix...\n";
-    const auto start{std::chrono::steady_clock::now()};
+    using VT = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>;
+    VT b = VT::Zero(system_size);
+
+    std::cout << "Assemblying linear system...\n";
+    const auto asm_start{std::chrono::steady_clock::now()};
     mommy::compute_matrix(msh, bfs, Z);
-    const auto end{std::chrono::steady_clock::now()};
-    const std::chrono::duration<double> elapsed_seconds{end - start};
-    std::cout << "ASM time: " << elapsed_seconds << " seconds\n";
+    mommy::compute_rhs(msh, bfs, b);
+    const auto asm_end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
+    std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
 
     H5Easy::File file("mommy.h5", H5Easy::File::Truncate);
     file.createDataSet("mommy/Z", Z);
+
+    std::cout << "Solving linear system...\n";
+    const auto start{std::chrono::steady_clock::now()};
+    VT x = Z.lu().solve(b);
+    const auto end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> elapsed_seconds{end - start};
+    std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
+
+    std::vector<double> data;
+    data.resize( msh.triangles.size(), 0.0 );
+
+    for (const auto& ibf : bfs) {
+    
+        const auto& Tminus = msh.triangles[ibf.itminus];
+        const auto& Tplus = msh.triangles[ibf.itplus];
+
+        auto bar_Tminus = barycenter(msh, Tminus);
+        auto bar_Tplus = barycenter(msh, Tplus);
+
+        auto cminus = ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index);
+        auto cplus = ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index);
+
+        data[ibf.itminus] += cminus.dot(cminus).real();
+        data[ibf.itplus] += cplus.dot(cplus).real();
+    }
+
+    db.add_variable("mesh", "mag", data, mommy::var_centering::zonal);
 
     return 0;
 }

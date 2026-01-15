@@ -93,6 +93,7 @@ struct neighbours {
     size_t                  loc_eminus; // Local edge number in T-
     std::optional<size_t>   itplus;     // T+ index
     std::optional<size_t>   loc_eplus;  // Local edge number in T+
+    std::optional<size_t>   interface;  // Interface number, if interface
 };
 struct mesh {
     std::vector<point>          vertices;

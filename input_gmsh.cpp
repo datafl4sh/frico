@@ -218,6 +218,14 @@ compute_connectivity(mesh& msh)
             assert( (not en.itplus) or (en.itminus < en.itplus.value()) );
         }
     }
+
+    for (auto& be : msh.boundary_edges) {
+        assert(be.offset < msh.edge_neighbours.size());
+        if (msh.edge_neighbours[be.offset].itplus) {
+            msh.edge_neighbours[be.offset].interface = be.tag;
+            //std::cout << "edge " << be.offset << ": " << be.tag << "\n";
+        }
+    }
 }
 
 void

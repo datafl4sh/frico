@@ -119,6 +119,7 @@ inline double
 norm(const vec3& v)
 {
     return std::sqrt( v.x()*v.x() + v.y()*v.y() + v.z()*v.z() );
+    //return std::hypot(v.x(), v.y(), v.z());
 }
 
 inline std::ostream&
