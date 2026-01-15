@@ -156,9 +156,9 @@ void
 compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
     Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>& Z)
 {
-    size_t intdeg = 2;
+    size_t intdeg = 3;
 
-    double freq = 1200e6;
+    double freq = 300e6;
     double omega = 2.0*M_PI*freq;
     double wn = omega*std::sqrt(MU0*EPS0);
     double inv_wnsq = 1./(wn*wn);
@@ -175,57 +175,35 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             bool split = num_shared_vertices(msh, ibf.edge_index, jbf.edge_index) != 0;
 
             auto jqps_minus = split?
-                integrate_subtri(msh, jTminus, intdeg) :
+                integrate(msh, jTminus, intdeg+1) :
                 integrate(msh, jTminus, intdeg);
 
             auto jqps_plus = split?
-                integrate_subtri(msh, jTplus, intdeg) :
+                integrate(msh, jTplus, intdeg+1) :
                 integrate(msh, jTplus, intdeg);
 
             std::complex<double> entry = 0.0;
             double prodl = 0.25 * ibf.length * jbf.length * M_1_PI;
 
             /* iT-, jT- */
+            auto inv_AmAm = 1. / (ibf.Aminus * jbf.Aminus);
             for (const auto& iqp : iqps_minus) {
                 for (const auto& jqp : jqps_minus) {
-                    double prodw = iqp.w * jqp.w;
+                    double prodw = iqp.w * jqp.w * inv_AmAm;
                     double prod = 0.25*dot(iqp.p - ibf.pminus, jqp.p - jbf.pminus);
                     double Rij = norm(iqp.p - jqp.p);
-                    double t = prodw * ( prod + inv_wnsq ) / Rij;
+                    double t = prodw * ( prod - inv_wnsq ) / Rij;
                     std::complex<double> exponent{0, -wn*Rij};
                     entry += prodl * t * std::exp(exponent);
                 }
             }
 
             /* iT-, jT+ */
+            auto inv_AmAp = 1. / (ibf.Aminus * jbf.Aplus);
             for (const auto& iqp : iqps_minus) {
                 for (const auto& jqp : jqps_plus) {
-                    double prodw = iqp.w * jqp.w;
+                    double prodw = iqp.w * jqp.w * inv_AmAp;
                     double prod = 0.25*dot(iqp.p - ibf.pminus, jbf.pplus - jqp.p);
-                    double Rij = norm(iqp.p - jqp.p);
-                    double t = prodw * ( prod - inv_wnsq ) / Rij;
-                    std::complex<double> exponent{0, -wn*Rij};
-                    entry += prodl * t * std::exp(exponent);
-                }
-            }
-
-            /* iT+, jT- */
-            for (const auto& iqp : iqps_plus) {
-                for (const auto& jqp : jqps_minus) {
-                    double prodw = iqp.w * jqp.w;
-                    double prod = 0.25*dot(ibf.pplus - iqp.p, jqp.p - jbf.pminus);
-                    double Rij = norm(iqp.p - jqp.p);
-                    double t = prodw * ( prod - inv_wnsq ) / Rij;
-                    std::complex<double> exponent{0, -wn*Rij};
-                    entry += prodl * t * std::exp(exponent);
-                }
-            }
-
-            /* iT+, jT+ */
-            for (const auto& iqp : iqps_plus) {
-                for (const auto& jqp : jqps_plus) {
-                    double prodw = iqp.w * jqp.w;
-                    double prod = 0.25*dot(ibf.pplus - iqp.p, jbf.pplus - jqp.p);
                     double Rij = norm(iqp.p - jqp.p);
                     double t = prodw * ( prod + inv_wnsq ) / Rij;
                     std::complex<double> exponent{0, -wn*Rij};
@@ -233,7 +211,33 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                 }
             }
 
-            Z(jbf.matrix_index, ibf.matrix_index) = entry;
+            /* iT+, jT- */
+            auto inv_ApAm = inv_AmAp;
+            for (const auto& iqp : iqps_plus) {
+                for (const auto& jqp : jqps_minus) {
+                    double prodw = iqp.w * jqp.w * inv_ApAm;
+                    double prod = 0.25*dot(ibf.pplus - iqp.p, jqp.p - jbf.pminus);
+                    double Rij = norm(iqp.p - jqp.p);
+                    double t = prodw * ( prod + inv_wnsq ) / Rij;
+                    std::complex<double> exponent{0, -wn*Rij};
+                    entry += prodl * t * std::exp(exponent);
+                }
+            }
+
+            /* iT+, jT+ */
+            auto inv_ApAp = 1. / (ibf.Aplus * jbf.Aplus);
+            for (const auto& iqp : iqps_plus) {
+                for (const auto& jqp : jqps_plus) {
+                    double prodw = iqp.w * jqp.w * inv_ApAp;
+                    double prod = 0.25*dot(ibf.pplus - iqp.p, jbf.pplus - jqp.p);
+                    double Rij = norm(iqp.p - jqp.p);
+                    double t = prodw * ( prod - inv_wnsq ) / Rij;
+                    std::complex<double> exponent{0, -wn*Rij};
+                    entry += prodl * t * std::exp(exponent);
+                }
+            }
+
+            Z(ibf.matrix_index, jbf.matrix_index) = entry;
         } // for jbf
     } // for ibf
 }
@@ -244,11 +248,9 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
 {
     size_t intdeg = 2;
 
-    double freq = 1200e6;
+    double freq = 300e6;
     double omega = 2.0*M_PI*freq;
     double wn = omega*std::sqrt(MU0*EPS0);
-
-    Eigen::Matrix<std::complex<double>, 3, 1> E{1.0, 0.0, 0.0};
 
     for (const auto& ibf : bfs) {
     
@@ -257,16 +259,14 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
         }
     
         auto itf_tag = ibf.interface.value();
-        std::cout << "rhs: itf tag " << itf_tag << "\n";
+        std::cout << "rhs: itf tag " << itf_tag << " idx " << ibf.matrix_index << "\n";
 
         const auto& iTminus = msh.triangles[ibf.itminus];
         const auto& iTplus = msh.triangles[ibf.itplus];
-        //auto iqps_minus = integrate(msh, iTminus, intdeg);
-        //auto iqps_plus = integrate(msh, iTplus, intdeg);
 
         std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
 
-        b(ibf.matrix_index) += entry;
+        b(ibf.matrix_index) = entry;
     }
 }
 
@@ -274,6 +274,8 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
 
 int main(int argc, char **argv)
 {
+    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+
     if (argc < 2) {
         std::cerr << "Please specify GMSH .geo file" << std::endl;
         return 1;
@@ -378,6 +380,7 @@ int main(int argc, char **argv)
     std::cout << "Assemblying linear system...\n";
     const auto asm_start{std::chrono::steady_clock::now()};
     mommy::compute_matrix(msh, bfs, Z);
+    //Z = (Z + Z.transpose()) * 0.5;
     mommy::compute_rhs(msh, bfs, b);
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
@@ -393,8 +396,12 @@ int main(int argc, char **argv)
     const std::chrono::duration<double> elapsed_seconds{end - start};
     std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
 
-    std::vector<double> data;
-    data.resize( msh.triangles.size(), 0.0 );
+    std::vector<double> data( msh.triangles.size() );
+
+    Eigen::Matrix<double, Eigen::Dynamic, 3> vdata =
+        Eigen::Matrix<double, Eigen::Dynamic, 3>::Zero( msh.triangles.size(), 3 );
+
+    Eigen::Matrix<double, 3, 1> temp;
 
     for (const auto& ibf : bfs) {
     
@@ -404,14 +411,24 @@ int main(int argc, char **argv)
         auto bar_Tminus = barycenter(msh, Tminus);
         auto bar_Tplus = barycenter(msh, Tplus);
 
-        auto cminus = ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index);
-        auto cplus = ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index);
+        auto cminus = (ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index)).eval();
+        for (size_t i = 0; i < 3; i++) {
+            temp(i) = std::abs(cminus(i));
+        }
+        vdata.row(ibf.itminus) += temp;
+
+        auto cplus = (ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index)).eval();
+        for (size_t i = 0; i < 3; i++) {
+            temp(i) = std::abs(cplus(i));
+        }
+        vdata.row(ibf.itplus) += temp;
 
         data[ibf.itminus] += cminus.dot(cminus).real();
         data[ibf.itplus] += cplus.dot(cplus).real();
     }
 
     db.add_variable("mesh", "mag", data, mommy::var_centering::zonal);
+    db.add_variable("mesh", "J", vdata, mommy::var_centering::zonal);
 
     return 0;
 }

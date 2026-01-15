@@ -7,8 +7,8 @@ set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-#set (CMAKE_CXX_FLAGS "-fsanitize=address")
-set (CMAKE_CXX_FLAGS "-g")
+set (CMAKE_CXX_FLAGS "-fsanitize=address")
+#set (CMAKE_CXX_FLAGS "-g")
 
 find_package(GMSH REQUIRED)
 set(LINK_LIBS ${LINK_LIBS} GMSH)
