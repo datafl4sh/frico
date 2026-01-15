@@ -37,7 +37,7 @@ public:
         : x_(0.0), y_(0.0), z_(0.0)
     {}
 
-    vec3(double x, double y, double z)
+    inline vec3(double x, double y, double z)
         : x_(x), y_(y), z_(z)
     {}
 
@@ -48,7 +48,7 @@ public:
     inline double z() const { return z_; }
 
     inline vec3 operator-() const {
-        return vec3(-x_, -y_, -z_);
+        return {-x_, -y_, -z_};
     }
 
     inline vec3& operator+=(const vec3& other) {
@@ -59,9 +59,7 @@ public:
     }
 
     inline vec3 operator+(const vec3& other) const {
-        vec3 ret = *this;
-        ret += other;
-        return ret;
+        return { x_ + other.x_, y_ + other.y_, z_ + other.z_ };
     }
 
     vec3& operator-=(const vec3& other) {
@@ -70,7 +68,7 @@ public:
     }
 
     vec3 operator-(const vec3& other) const {
-        return (*this) + (-other);
+        return { x_ - other.x_, y_ - other.y_, z_ - other.z_ };
     }
 
     vec3& operator*=(double s) {
@@ -81,9 +79,7 @@ public:
     }
 
     vec3 operator*(double s) const {
-        vec3 ret = *this;
-        ret *= s;
-        return ret;
+        return { x_ * s, y_ * s, z_ * s };
     }
 
     vec3& operator/=(double s) {
@@ -94,15 +90,19 @@ public:
     }
 
     vec3 operator/(double s) const {
-        vec3 ret = *this;
-        ret /= s;
-        return ret;
+        return { x_ / s, y_ / s, z_ / s };
     }
 };
 
 inline vec3
 operator*(double s, const vec3& p) {
     return p*s;
+}
+
+inline double
+dot(const vec3& a, const vec3& b)
+{
+    return a.x()*b.x() + a.y()*b.y() + a.z()*b.z();
 }
 
 inline vec3

@@ -103,9 +103,7 @@ void populate_data(const mesh& msh, std::vector<basis_function>& bfs)
         if (not en.itplus) {
             continue; // it is a boundary edge
         }
-
-        size_t integration_degree = 4;
-
+    
         auto Tminus = msh.triangles[en.itminus];
         auto Tplus  = msh.triangles[en.itplus.value()];
 
@@ -123,8 +121,6 @@ void populate_data(const mesh& msh, std::vector<basis_function>& bfs)
         bf.itplus = en.itplus.value();
         bf.pminus = msh.vertices[ipminus];
         bf.pplus = msh.vertices[ipplus];
-        //bf.qminus = integrate(msh, Tminus, integration_degree);
-        //bf.qplus = integrate(msh, Tplus, integration_degree);
         bf.length = measure(msh, msh.edges[iedg]);
         bf.edge_index = iedg;
         bf.matrix_index = matrix_index++;
@@ -187,7 +183,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             for (const auto& iqp : iqps_minus) {
                 for (const auto& jqp : jqps_minus) {
                     double prodw = iqp.w * jqp.w;
-                    double prod = 0.25*ibf.vec_minus(iqp.p).dot(jbf.vec_minus(jqp.p));
+                    double prod = 0.25*dot(iqp.p - ibf.pminus, jqp.p - jbf.pminus);
                     double Rij = norm(iqp.p - jqp.p);
                     double t = prodw * ( prod + inv_wnsq ) / Rij;
                     std::complex<double> exponent{0, -wn*Rij};
@@ -199,7 +195,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             for (const auto& iqp : iqps_minus) {
                 for (const auto& jqp : jqps_plus) {
                     double prodw = iqp.w * jqp.w;
-                    double prod = 0.25*ibf.vec_minus(iqp.p).dot(jbf.vec_plus(jqp.p));
+                    double prod = 0.25*dot(iqp.p - ibf.pminus, jbf.pplus - jqp.p);
                     double Rij = norm(iqp.p - jqp.p);
                     double t = prodw * ( prod - inv_wnsq ) / Rij;
                     std::complex<double> exponent{0, -wn*Rij};
@@ -211,7 +207,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             for (const auto& iqp : iqps_plus) {
                 for (const auto& jqp : jqps_minus) {
                     double prodw = iqp.w * jqp.w;
-                    double prod = 0.25*ibf.vec_plus(iqp.p).dot(jbf.vec_minus(jqp.p));
+                    double prod = 0.25*dot(ibf.pplus - iqp.p, jqp.p - jbf.pminus);
                     double Rij = norm(iqp.p - jqp.p);
                     double t = prodw * ( prod - inv_wnsq ) / Rij;
                     std::complex<double> exponent{0, -wn*Rij};
@@ -223,7 +219,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             for (const auto& iqp : iqps_plus) {
                 for (const auto& jqp : jqps_plus) {
                     double prodw = iqp.w * jqp.w;
-                    double prod = 0.25*ibf.vec_plus(iqp.p).dot(jbf.vec_plus(jqp.p));
+                    double prod = 0.25*dot(ibf.pplus - iqp.p, jbf.pplus - jqp.p);
                     double Rij = norm(iqp.p - jqp.p);
                     double t = prodw * ( prod + inv_wnsq ) / Rij;
                     std::complex<double> exponent{0, -wn*Rij};
@@ -231,7 +227,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                 }
             }
 
-            Z(jbf.matrix_index, ibf.matrix_index) = entry;
+            Z(ibf.matrix_index, jbf.matrix_index) = entry;
         } // for jbf
     } // for ibf
 }
