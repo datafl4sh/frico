@@ -156,7 +156,7 @@ void
 compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
     Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>& Z)
 {
-    size_t intdeg = 3;
+    size_t intdeg = 4;
 
     double freq = 300e6;
     double omega = 2.0*M_PI*freq;
@@ -175,11 +175,11 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             bool split = num_shared_vertices(msh, ibf.edge_index, jbf.edge_index) != 0;
 
             auto jqps_minus = split?
-                integrate(msh, jTminus, intdeg+1) :
+                integrate_subtri(msh, jTminus, intdeg) :
                 integrate(msh, jTminus, intdeg);
 
             auto jqps_plus = split?
-                integrate(msh, jTplus, intdeg+1) :
+                integrate_subtri(msh, jTplus, intdeg) :
                 integrate(msh, jTplus, intdeg);
 
             std::complex<double> entry = 0.0;
@@ -212,7 +212,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             }
 
             /* iT+, jT- */
-            auto inv_ApAm = inv_AmAp;
+            auto inv_ApAm = 1. / (ibf.Aplus * jbf.Aminus);
             for (const auto& iqp : iqps_plus) {
                 for (const auto& jqp : jqps_minus) {
                     double prodw = iqp.w * jqp.w * inv_ApAm;
@@ -237,7 +237,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                 }
             }
 
-            Z(ibf.matrix_index, jbf.matrix_index) = entry;
+            Z(jbf.matrix_index, ibf.matrix_index) = entry;
         } // for jbf
     } // for ibf
 }
@@ -380,7 +380,6 @@ int main(int argc, char **argv)
     std::cout << "Assemblying linear system...\n";
     const auto asm_start{std::chrono::steady_clock::now()};
     mommy::compute_matrix(msh, bfs, Z);
-    //Z = (Z + Z.transpose()) * 0.5;
     mommy::compute_rhs(msh, bfs, b);
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
