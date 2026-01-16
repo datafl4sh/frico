@@ -95,12 +95,22 @@ struct neighbours {
     std::optional<size_t>   loc_eplus;  // Local edge number in T+
     std::optional<size_t>   interface;  // Interface number, if interface
 };
+
+struct bf_info {
+    size_t  edge_index;
+    double  sign;
+    point   p;
+};
+
+using triangle_bf_info = std::array<std::optional<bf_info>, 3>;
+
 struct mesh {
     std::vector<point>          vertices;
     std::vector<bedgeptr>       boundary_edges;
     std::vector<edge>           edges;
     std::vector<triangle>       triangles;
     std::vector<neighbours>     edge_neighbours;
+    std::vector<triangle_bf_info>   tbis;
 };
 
 template<typename T>
@@ -123,6 +133,16 @@ double measure(const mesh&, const edge&);
 double measure(const mesh&, const triangle&);
 bool is_boundary(const mesh&, const edge&);
 size_t num_internal_edges(const mesh&);
+
+inline std::array<edge, 3>
+edges(const triangle& tri)
+{
+    return {{
+        { tri.iv0, tri.iv1 },
+        { tri.iv1, tri.iv2 },
+        { tri.iv2, tri.iv0 }
+    }};
+}
 
 Eigen::Matrix<double, 3, 1> normal(const mesh&, const triangle&);
 

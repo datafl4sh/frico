@@ -168,15 +168,7 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
     }
 }
 
-std::array<edge, 3>
-edges(const triangle& tri)
-{
-    return {{
-        { tri.iv0, tri.iv1 },
-        { tri.iv1, tri.iv2 },
-        { tri.iv2, tri.iv0 }
-    }};
-}
+
 
 static void
 compute_connectivity(mesh& msh)
@@ -223,8 +215,57 @@ compute_connectivity(mesh& msh)
         assert(be.offset < msh.edge_neighbours.size());
         if (msh.edge_neighbours[be.offset].itplus) {
             msh.edge_neighbours[be.offset].interface = be.tag;
-            //std::cout << "edge " << be.offset << ": " << be.tag << "\n";
         }
+    }
+
+    /* to obtain basis functions from triangles */
+    for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+        const auto& tri = msh.triangles[itri];
+        auto edgs = edges(tri);
+        std::array<size_t, 3> ofss;
+        ofss[0] = offset(msh.edges, edgs[0]).value();
+        ofss[1] = offset(msh.edges, edgs[1]).value();
+        ofss[2] = offset(msh.edges, edgs[2]).value();
+
+        triangle_bf_info tbi;
+
+        std::array<size_t, 3> evmap {2, 0, 1};
+
+        for (int iedg = 0; iedg < 3; iedg++) {
+            auto ofs = ofss[iedg];
+            auto& en = msh.edge_neighbours[ofs];
+            if (not en.itplus) {
+                continue;
+            }
+        
+            /* negative */
+            if (itri == en.itminus) {
+                auto T = msh.triangles[en.itminus];
+                std::array<size_t, 3> ivt{T.iv0, T.iv1, T.iv2};
+                auto ip = ivt[evmap[iedg]];
+                
+                bf_info bi;
+                bi.edge_index = ofss[iedg];
+                bi.sign = -1;
+                bi.p = msh.vertices[ip];
+                tbi[iedg] = bi;
+            }
+
+            /* positive */
+            if (itri == en.itplus.value()) {
+                auto T = msh.triangles[en.itplus.value()];
+                std::array<size_t, 3> ivt{T.iv0, T.iv1, T.iv2};
+                auto ip = ivt[evmap[iedg]];
+                
+                bf_info bi;
+                bi.edge_index = ofss[iedg];
+                bi.sign = +1;
+                bi.p = msh.vertices[ip];
+                tbi[iedg] = bi;
+            }
+        }
+
+        msh.tbis.push_back(tbi);
     }
 }
 

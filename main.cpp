@@ -24,7 +24,7 @@
 #include <fstream>
 #include <chrono>
 
-#include <Eigen/Dense>
+#include "eigen.hpp"
 
 #include <highfive/H5Easy.hpp>
 
@@ -34,102 +34,66 @@
 #include "input_gmsh.h"
 #include "output_silo.h"
 #include "quadratures.h"
+#include "rwg_basis.hpp"
 
 #define MU0     1.256637061435917e-06
 #define EPS0    8.8541878188e-12
 namespace mommy {
 
-struct basis_function
+struct config
 {
-    double  Aminus;
-    double  Aplus;
-    size_t  itminus;
-    size_t  itplus;
-    point   pminus;
-    point   pplus;
-    double  length;
-    size_t  edge_index;
-    size_t  matrix_index;
-    std::optional<size_t>   interface;
-
-    Eigen::Matrix<double,3,1> eval_minus(const point& r) const;
-    Eigen::Matrix<double,3,1> eval_plus(const point& r) const;
-
-    Eigen::Matrix<double,3,1> vec_minus(const point& r) const;
-    Eigen::Matrix<double,3,1> vec_plus(const point& r) const;
+    double  frequency;
+    size_t  degree;
 };
 
-inline Eigen::Matrix<double, 3, 1>
-basis_function::eval_minus(const point& r) const
+ddvector prjtest(const mesh& msh, const std::vector<basis_function>& bfs)
 {
-    auto v = r - pminus;
-    auto f = length*v/(2.0*Aminus);
-    return { f.x(), f.y(), f.z() };
-}
+    ddmatrix mass = ddmatrix::Zero(bfs.size(), bfs.size());
+    ddvector rhs = ddvector::Zero(bfs.size());
 
-inline Eigen::Matrix<double, 3, 1>
-basis_function::eval_plus(const point& r) const
-{
-    auto v = pplus - r;
-    auto f = length*v/(2.0*Aplus);
-    return { f.x(), f.y(), f.z() };
-}
-
-inline Eigen::Matrix<double, 3, 1>
-basis_function::vec_minus(const point& r) const
-{
-    auto v = r - pminus;
-    return { v.x(), v.y(), v.z() };
-}
-
-inline Eigen::Matrix<double, 3, 1>
-basis_function::vec_plus(const point& r) const
-{
-    auto v = pplus - r;
-    return { v.x(), v.y(), v.z() };
-}
-
-std::ostream&
-operator<<(std::ostream& os, const basis_function& bf)
-{
-    os << bf.edge_index << " " << bf.matrix_index << " " << bf.itminus;
-    os << " " << bf.itplus;
-    return os;
-}
-
-void populate_data(const mesh& msh, std::vector<basis_function>& bfs)
-{
-    bfs.reserve( num_internal_edges(msh) );
-    size_t matrix_index = 0;
-    for (size_t iedg = 0; iedg < msh.edge_neighbours.size(); iedg++) {
-        const auto& en = msh.edge_neighbours[iedg];
-        if (not en.itplus) {
-            continue; // it is a boundary edge
-        }
-    
-        auto Tminus = msh.triangles[en.itminus];
-        auto Tplus  = msh.triangles[en.itplus.value()];
-
-        std::array<size_t, 3> ivtminus {Tminus.iv0, Tminus.iv1, Tminus.iv2};
-        std::array<size_t, 3> ivtplus {Tplus.iv0, Tplus.iv1, Tplus.iv2};
-
-        std::array<size_t, 3> lvmap {2, 0, 1};
-        size_t ipminus = ivtminus[lvmap[en.loc_eminus]];
-        size_t ipplus = ivtplus[lvmap[en.loc_eplus.value()]];
-
-        basis_function bf;
-        bf.Aminus = measure(msh, Tminus);
-        bf.Aplus = measure(msh, Tplus);
-        bf.itminus = en.itminus;
-        bf.itplus = en.itplus.value();
-        bf.pminus = msh.vertices[ipminus];
-        bf.pplus = msh.vertices[ipplus];
-        bf.length = measure(msh, msh.edges[iedg]);
-        bf.edge_index = iedg;
-        bf.matrix_index = matrix_index++;
-        bf.interface = en.interface;
-        bfs.push_back(bf);
+    std::vector<size_t> cmap;
+    cmap.resize( msh.edges.size() );
+    for (const auto& bf : bfs) {
+        cmap[bf.edge_index] = bf.matrix_index;
     }
+
+    for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+        const auto& tri = msh.triangles[itri];
+        const auto& tbi = msh.tbis[itri];
+
+        auto qps = integrate(msh, tri, 2);
+        for (const auto& qp : qps) {
+            for (size_t i = 0; i < 3; i++) {
+                if (not tbi[i]) { continue; }
+                auto bi = *tbi[i];
+                auto gi = cmap[ bi.edge_index ];
+                const auto& ibf = bfs[ gi ];
+                edvec3 ibfval = (bi.sign > 0) ? ibf.eval_plus(qp.p) : ibf.eval_minus(qp.p);
+
+                for (size_t j = 0; j < 3; j++) {
+                    if (not tbi[j]) { continue; }
+                    auto bj = *tbi[j];
+                    auto gj = cmap[ bj.edge_index ];
+                    const auto& jbf = bfs[ gj ];
+                    edvec3 jbfval = (bj.sign > 0) ? jbf.eval_plus(qp.p) : jbf.eval_minus(qp.p);
+
+                    mass(gi,gj) += qp.w * jbfval.dot(ibfval);
+                }
+
+                edvec3 f{1.0 - qp.p.y(), 1.0 - qp.p.x(), 0};
+                rhs(gi) += qp.w * f.dot(ibfval);
+            }
+        }
+    }
+
+    ddvector sol = mass.lu().solve(rhs);
+
+    H5Easy::File file("proj.h5", H5Easy::File::Truncate);
+    file.createDataSet("proj/Z", mass);
+    file.createDataSet("proj/b", rhs);
+    file.createDataSet("proj/x", sol);
+
+    return sol;
 }
 
 int
@@ -154,20 +118,18 @@ num_shared_vertices(const mesh& msh, const size_t eia, const size_t eib)
 
 void
 compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
-    Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>& Z)
+    zdmatrix& Z, const config& cfg)
 {
-    size_t intdeg = 4;
-
-    double freq = 300e6;
+    double freq = cfg.frequency;
     double omega = 2.0*M_PI*freq;
-    double wn = omega*std::sqrt(MU0*EPS0);
-    double inv_wnsq = 1./(wn*wn);
+    double k = omega*std::sqrt(MU0*EPS0);
+    double inv_ksq = 1./(k*k);
 
     for (const auto& ibf : bfs) {
         const auto& iTminus = msh.triangles[ibf.itminus];
         const auto& iTplus = msh.triangles[ibf.itplus];
-        auto iqps_minus = integrate(msh, iTminus, intdeg);
-        auto iqps_plus = integrate(msh, iTplus, intdeg);
+        auto iqps_minus = integrate(msh, iTminus, cfg.degree);
+        auto iqps_plus = integrate(msh, iTplus, cfg.degree);
 
         for (const auto& jbf : bfs) {
             const auto& jTminus = msh.triangles[jbf.itminus];
@@ -175,12 +137,12 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             bool split = num_shared_vertices(msh, ibf.edge_index, jbf.edge_index) != 0;
 
             auto jqps_minus = split?
-                integrate_subtri(msh, jTminus, intdeg) :
-                integrate(msh, jTminus, intdeg);
+                integrate_subtri(msh, jTminus, cfg.degree) :
+                integrate(msh, jTminus, cfg.degree);
 
             auto jqps_plus = split?
-                integrate_subtri(msh, jTplus, intdeg) :
-                integrate(msh, jTplus, intdeg);
+                integrate_subtri(msh, jTplus, cfg.degree) :
+                integrate(msh, jTplus, cfg.degree);
 
             std::complex<double> entry = 0.0;
             double prodl = 0.25 * ibf.length * jbf.length * M_1_PI;
@@ -189,12 +151,13 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             auto inv_AmAm = 1. / (ibf.Aminus * jbf.Aminus);
             for (const auto& iqp : iqps_minus) {
                 for (const auto& jqp : jqps_minus) {
-                    double prodw = iqp.w * jqp.w * inv_AmAm;
-                    double prod = 0.25*dot(iqp.p - ibf.pminus, jqp.p - jbf.pminus);
+                    double v = 0.25*dot( ibf.rho_minus(iqp.p), jbf.rho_minus(jqp.p) );
+                    double s = inv_ksq;
+                    double w = iqp.w * jqp.w * inv_AmAm;
                     double Rij = norm(iqp.p - jqp.p);
-                    double t = prodw * ( prod - inv_wnsq ) / Rij;
-                    std::complex<double> exponent{0, -wn*Rij};
-                    entry += prodl * t * std::exp(exponent);
+                    std::complex<double> exponent{0, -k*Rij};
+                    std::complex<double> g = std::exp(exponent)/Rij;
+                    entry += prodl * w * (v - s) * g;
                 }
             }
 
@@ -202,12 +165,13 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             auto inv_AmAp = 1. / (ibf.Aminus * jbf.Aplus);
             for (const auto& iqp : iqps_minus) {
                 for (const auto& jqp : jqps_plus) {
-                    double prodw = iqp.w * jqp.w * inv_AmAp;
-                    double prod = 0.25*dot(iqp.p - ibf.pminus, jbf.pplus - jqp.p);
+                    double v = 0.25*dot( ibf.rho_minus(iqp.p), jbf.rho_plus(jqp.p) );
+                    double s = inv_ksq;
+                    double w = iqp.w * jqp.w * inv_AmAp;
                     double Rij = norm(iqp.p - jqp.p);
-                    double t = prodw * ( prod + inv_wnsq ) / Rij;
-                    std::complex<double> exponent{0, -wn*Rij};
-                    entry += prodl * t * std::exp(exponent);
+                    std::complex<double> exponent{0, -k*Rij};
+                    std::complex<double> g = std::exp(exponent)/Rij;
+                    entry -= prodl * w * (v - s) * g;
                 }
             }
 
@@ -215,12 +179,13 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             auto inv_ApAm = 1. / (ibf.Aplus * jbf.Aminus);
             for (const auto& iqp : iqps_plus) {
                 for (const auto& jqp : jqps_minus) {
-                    double prodw = iqp.w * jqp.w * inv_ApAm;
-                    double prod = 0.25*dot(ibf.pplus - iqp.p, jqp.p - jbf.pminus);
+                    double v = 0.25*dot( ibf.rho_plus(iqp.p), jbf.rho_minus(jqp.p) );
+                    double s = inv_ksq;
+                    double w = iqp.w * jqp.w * inv_ApAm;
                     double Rij = norm(iqp.p - jqp.p);
-                    double t = prodw * ( prod + inv_wnsq ) / Rij;
-                    std::complex<double> exponent{0, -wn*Rij};
-                    entry += prodl * t * std::exp(exponent);
+                    std::complex<double> exponent{0, -k*Rij};
+                    std::complex<double> g = std::exp(exponent)/Rij;
+                    entry -= prodl * w * (v - s) * g;
                 }
             }
 
@@ -228,12 +193,13 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             auto inv_ApAp = 1. / (ibf.Aplus * jbf.Aplus);
             for (const auto& iqp : iqps_plus) {
                 for (const auto& jqp : jqps_plus) {
-                    double prodw = iqp.w * jqp.w * inv_ApAp;
-                    double prod = 0.25*dot(ibf.pplus - iqp.p, jbf.pplus - jqp.p);
+                    double v = 0.25*dot( ibf.rho_plus(iqp.p), jbf.rho_plus(jqp.p) );
+                    double s = inv_ksq;
+                    double w = iqp.w * jqp.w * inv_ApAp;
                     double Rij = norm(iqp.p - jqp.p);
-                    double t = prodw * ( prod - inv_wnsq ) / Rij;
-                    std::complex<double> exponent{0, -wn*Rij};
-                    entry += prodl * t * std::exp(exponent);
+                    std::complex<double> exponent{0, -k*Rij};
+                    std::complex<double> g = std::exp(exponent)/Rij;
+                    entry += prodl * w * (v - s) * g;
                 }
             }
 
@@ -244,11 +210,9 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
 
 void
 compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
-    Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>& b)
+    zdvector& b, const config& cfg)
 {
-    size_t intdeg = 2;
-
-    double freq = 300e6;
+    double freq = cfg.frequency;
     double omega = 2.0*M_PI*freq;
     double wn = omega*std::sqrt(MU0*EPS0);
 
@@ -274,16 +238,43 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
 
 int main(int argc, char **argv)
 {
-    _MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+    //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
-    if (argc < 2) {
-        std::cerr << "Please specify GMSH .geo file" << std::endl;
-        return 1;
+    const char *gmsh_geo_path = nullptr;
+    const char *silo_path = "test.silo";
+    mommy::config cfg;
+    cfg.frequency = 0;
+    cfg.degree = 2;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "f:g:k:s:")) != -1) {
+        switch (opt) {
+        case 'f':
+            cfg.frequency = std::stod(optarg);
+            break;
+        case 'g':
+            gmsh_geo_path = optarg;
+            break;
+        case 'k':
+            cfg.degree = std::stoull(optarg);
+            break;
+        case 's':
+            silo_path = optarg;
+            break;
+        default:
+            std::cerr << "Invalid argument\n";
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (gmsh_geo_path == nullptr) {
+        std::cerr << "No geometry specified (-g)\n";
+        return EXIT_FAILURE;
     }
 
     try {
-        gmsh::initialize(argc, argv);
-        gmsh::open(argv[1]);
+        gmsh::initialize();
+        gmsh::open(gmsh_geo_path);
     }
 
     catch (const std::runtime_error& e) {
@@ -300,7 +291,7 @@ int main(int argc, char **argv)
 
     std::cout << msh.vertices.size() << " " << msh.triangles.size() << std::endl;
 
-    mommy::silo db("test.silo");
+    mommy::silo db(silo_path);
     db.add_mesh("mesh", msh);
 
     double l = 0.0;
@@ -322,8 +313,7 @@ int main(int argc, char **argv)
 
     db.add_variable("mesh", "test", test, mommy::var_centering::zonal);
 
-    Eigen::VectorXd vals;
-    vals = Eigen::VectorXd::Zero(msh.vertices.size());
+    mommy::ddvector vals = mommy::ddvector::Zero(msh.vertices.size());
     for (size_t i = 0; i < msh.vertices.size(); i++) {
         const auto& vtx = msh.vertices[i];
         auto val = std::sin(M_PI*vtx.x())*std::sin(M_PI*vtx.y());
@@ -331,8 +321,7 @@ int main(int argc, char **argv)
     }
     db.add_variable("mesh", "vals", vals, mommy::var_centering::nodal);
 
-    Eigen::Matrix<double, Eigen::Dynamic, 3> norms;
-    norms = Eigen::Matrix<double, Eigen::Dynamic, 3>::Zero(msh.triangles.size(), 3);
+    mommy::ddfield norms = mommy::ddfield::Zero(msh.triangles.size(), 3);
     for (size_t i = 0; i < msh.triangles.size(); i++) {
         norms.row(i) = normal(msh, msh.triangles[i]);
     }
@@ -344,8 +333,25 @@ int main(int argc, char **argv)
     std::cout << "IntEdges: " << mommy::num_internal_edges(msh) << std::endl;
 
     std::vector<mommy::basis_function> bfs;
-    mommy::populate_data(msh, bfs);
+    mommy::make_function_space(msh, bfs);
 
+    #if 0
+    for (size_t itri = 0; itri < msh.tbis.size(); itri++) {
+        const auto& tbi = msh.tbis[itri];
+        std::cout << "Triangle " << itri << "\n";
+        for (size_t i = 0; i < 3; i++) {
+            std::cout << "Edge " << i << ": ";
+            if (tbi[i]) {
+                auto bi = *tbi[i];
+                std::cout << bi.edge_index << ", ";
+                std::cout << bi.sign << ", " << bi.p; 
+            }
+            std::cout << "\n";
+        }
+    }
+    #endif
+
+    #if 0
     for (size_t i = 0; i < bfs.size(); i++)
     {
         const auto& bf = bfs[i];
@@ -369,36 +375,40 @@ int main(int argc, char **argv)
             ofs_plus << qp.p.x() << " " << qp.p.y() << " " << rho(0) << " " << rho(1) << "\n";
         }
     }
+    #endif
 
     auto system_size = mommy::num_internal_edges(msh);
     
-    using MT = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;
-    MT Z = MT::Zero(system_size, system_size);
-    using VT = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>;
-    VT b = VT::Zero(system_size);
+    mommy::zdmatrix Z = mommy::zdmatrix::Zero(system_size, system_size);
+    mommy::zdvector b = mommy::zdvector::Zero(system_size);
 
+    //#if 0
     std::cout << "Assemblying linear system...\n";
     const auto asm_start{std::chrono::steady_clock::now()};
-    mommy::compute_matrix(msh, bfs, Z);
-    mommy::compute_rhs(msh, bfs, b);
+    mommy::compute_matrix(msh, bfs, Z, cfg);
+    mommy::compute_rhs(msh, bfs, b, cfg);
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
     std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
 
-    H5Easy::File file("mommy.h5", H5Easy::File::Truncate);
-    file.createDataSet("mommy/Z", Z);
-
     std::cout << "Solving linear system...\n";
     const auto start{std::chrono::steady_clock::now()};
-    VT x = Z.lu().solve(b);
+    mommy::zdvector x = Z.lu().solve(b);
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
     std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
 
+    H5Easy::File file("mommy.h5", H5Easy::File::Truncate);
+    file.createDataSet("mommy/Z", Z);
+    file.createDataSet("mommy/b", b);
+    file.createDataSet("mommy/x", x);
+    //#endif
+
+    //mommy::ddvector x = prjtest(msh, bfs);
+
     std::vector<double> data( msh.triangles.size() );
 
-    Eigen::Matrix<double, Eigen::Dynamic, 3> vdata =
-        Eigen::Matrix<double, Eigen::Dynamic, 3>::Zero( msh.triangles.size(), 3 );
+    mommy::ddfield vdata = mommy::ddfield::Zero( msh.triangles.size(), 3 );
 
     Eigen::Matrix<double, 3, 1> temp;
 
@@ -412,18 +422,18 @@ int main(int argc, char **argv)
 
         auto cminus = (ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index)).eval();
         for (size_t i = 0; i < 3; i++) {
-            temp(i) = std::abs(cminus(i));
+            temp(i) = std::real(cminus(i));
         }
         vdata.row(ibf.itminus) += temp;
 
         auto cplus = (ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index)).eval();
         for (size_t i = 0; i < 3; i++) {
-            temp(i) = std::abs(cplus(i));
+            temp(i) = std::real(cplus(i));
         }
         vdata.row(ibf.itplus) += temp;
 
-        data[ibf.itminus] += cminus.dot(cminus).real();
-        data[ibf.itplus] += cplus.dot(cplus).real();
+        //data[ibf.itminus] += cminus;//cminus.dot(cminus).real();
+        //data[ibf.itplus] += cplus;//cplus.dot(cplus).real();
     }
 
     db.add_variable("mesh", "mag", data, mommy::var_centering::zonal);

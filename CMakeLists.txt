@@ -7,7 +7,7 @@ set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-set (CMAKE_CXX_FLAGS "-fsanitize=address")
+#set (CMAKE_CXX_FLAGS "-g -fsanitize=address")
 #set (CMAKE_CXX_FLAGS "-g")
 
 find_package(GMSH REQUIRED)
@@ -27,10 +27,19 @@ if (NOT DEFINED HIGHFIVE_USE_BOOST)
     set(HIGHFIVE_USE_BOOST Off)
 endif()
 
+set(MKL_INTERFACE_FULL intel_lp64)
+find_package(MKL CONFIG)
+if (MKL_FOUND)
+  set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
+  add_compile_definitions(-DHAVE_MKL)
+endif()
+
 add_subdirectory(deps/HighFive)
 set(LINK_LIBS ${LINK_LIBS} HighFive)
 
-set(SOURCES main.cpp geom_mesh.cpp input_gmsh.cpp output_silo.cpp quadratures.cpp)
+set(SOURCES main.cpp geom_mesh.cpp input_gmsh.cpp output_silo.cpp
+    quadratures.cpp rwg_basis.cpp
+)
 
 add_executable(mommy ${SOURCES})
 
