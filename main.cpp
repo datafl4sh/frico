@@ -124,6 +124,8 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
     double omega = 2.0*M_PI*freq;
     double k = omega*std::sqrt(MU0*EPS0);
     double inv_ksq = 1./(k*k);
+ 
+    double dmax = 0.0;
 
     for (const auto& ibf : bfs) {
         const auto& iTminus = msh.triangles[ibf.itminus];
@@ -157,7 +159,8 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     double Rij = norm(iqp.p - jqp.p);
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
-                    entry += prodl * w * (v - s) * g;
+                    entry += prodl * w * (v - s) * g; 
+                    dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -172,6 +175,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry -= prodl * w * (v - s) * g;
+                    dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -186,6 +190,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry -= prodl * w * (v - s) * g;
+                    dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -200,12 +205,15 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry += prodl * w * (v - s) * g;
+                    dmax = std::max(dmax, 1./Rij);
                 }
             }
 
             Z(jbf.matrix_index, ibf.matrix_index) = entry;
         } // for jbf
     } // for ibf
+
+    std::cout<< "dmax = "<< dmax << "\n";
 }
 
 void
@@ -301,10 +309,15 @@ int main(int argc, char **argv)
     std::cout << l << std::endl;
 
     double a = 0.0;
+    double ai = 0.0;
     for (auto& t : msh.triangles) {
         a += measure(msh, t);
+        auto qps = integrate(msh, t, 3);
+        for (auto& qp : qps) {
+            ai += qp.w;
+        }
     }
-    std::cout << a << std::endl;
+    std::cout << a << " " << ai << std::endl;
 
     std::vector<double> test;
     for (size_t i = 0; i < msh.triangles.size(); i++) {
