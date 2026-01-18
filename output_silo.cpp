@@ -219,7 +219,8 @@ silo::add_variable(const std::string& mesh_name,
     std::string def = "{" + vname_x + "," + vname_y + "," + vname_z + "}";
     const char *defs[] = { def.c_str() };
     int types[] = { DB_VARTYPE_VECTOR };
-    DBPutDefvars(db_, "defvars", 1, names, types, defs, NULL);
+    std::string defname = var_name + "defs";
+    DBPutDefvars(db_, defname.c_str(), 1, names, types, defs, NULL);
 
     return true;
 }

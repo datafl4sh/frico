@@ -371,33 +371,6 @@ dunavant(size_t degree, const point& p0, const point& p1, const point& p2)
     return ret;
 }
 
-std::vector<quadrature_point>
-integrate(const mesh& msh, const triangle& t, size_t degree)
-{
-    auto pts = points(msh, t);
-    return dunavant(degree, pts[0], pts[1], pts[2]);
-}
-
-std::vector<quadrature_point>
-integrate_subtri(const mesh& msh, const triangle& t, size_t degree)
-{
-    auto pts = points(msh, t);
-    auto bar = barycenter(msh, t);
-    
-    std::vector<quadrature_point> ret =
-        dunavant(degree, pts[0], pts[1], bar);
-    
-    std::vector<quadrature_point> q =
-        dunavant(degree, pts[1], pts[2], bar);
-    ret.insert(ret.end(), q.begin(), q.end());
-
-    q = dunavant(degree, pts[2], pts[0], bar);
-    ret.insert(ret.end(), q.begin(), q.end());
-
-    return ret;
-}
-
-#if 0
 /************ GAUSS ************/
 // The quadrature tables were stolen shamelessy from https://github.com/fvicini/gedim/
 
@@ -2648,8 +2621,6 @@ static struct triangle_gauss_rule triangle_gauss_rules[] = {
 
 } // namespace priv
 
-#define QUAD_RAW_TRIANGLE_GAUSS_MAX_ORDER 30
-
 std::vector<quadrature_point>
 triangle_gauss(size_t degree, const point& p0, const point& p1, const point& p2)
 {
@@ -2684,6 +2655,7 @@ triangle_gauss(size_t degree, const point& p0, const point& p1, const point& p2)
     }
     else 
     {
+        /*
         Eigen::Matrix<double,3,2> vertices;
         vertices << p0.x(), p0.y(), p1.x(), p1.y(), p2.x(), p2.y();  
 
@@ -2697,10 +2669,36 @@ triangle_gauss(size_t degree, const point& p0, const point& p1, const point& p2)
 
         for(size_t i = 0; i < qX.size(); i++ )
             ret.push_back({point({qX[i], qY[i]}), qw[i]});        
+        */
     }
 
     return ret;
 }
-#endif
+
+std::vector<quadrature_point>
+integrate(const mesh& msh, const triangle& t, size_t degree)
+{
+    auto pts = points(msh, t);
+    return dunavant(degree, pts[0], pts[1], pts[2]);
+}
+
+std::vector<quadrature_point>
+integrate_subtri(const mesh& msh, const triangle& t, size_t degree)
+{
+    auto pts = points(msh, t);
+    auto bar = barycenter(msh, t);
+    
+    std::vector<quadrature_point> ret =
+        dunavant(degree, pts[0], pts[1], bar);
+    
+    std::vector<quadrature_point> q =
+        dunavant(degree, pts[1], pts[2], bar);
+    ret.insert(ret.end(), q.begin(), q.end());
+
+    q = dunavant(degree, pts[2], pts[0], bar);
+    ret.insert(ret.end(), q.begin(), q.end());
+
+    return ret;
+}
 
 } //namespace mommy

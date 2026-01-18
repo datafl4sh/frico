@@ -96,26 +96,6 @@ ddvector prjtest(const mesh& msh, const std::vector<basis_function>& bfs)
     return sol;
 }
 
-int
-num_shared_vertices(const mesh& msh, const size_t eia, const size_t eib)
-{
-    assert(eia < msh.edges.size());
-    assert(eib < msh.edges.size());
-    auto ea = msh.edges[eia];
-    auto eb = msh.edges[eib];
-
-    if ( (ea.iv0 == eb.iv0) and (ea.iv1 == eb.iv1) ) {
-        return 2;
-    }
-
-    if ( (ea.iv0 == eb.iv0) or (ea.iv0 == eb.iv1) or
-         (ea.iv1 == eb.iv0) or (ea.iv1 == eb.iv1) ) {
-        return 1;
-    }
-
-    return 0;
-}
-
 void
 compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
     zdmatrix& Z, const config& cfg)
@@ -123,7 +103,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
     double freq = cfg.frequency;
     double omega = 2.0*M_PI*freq;
     double k = omega*std::sqrt(MU0*EPS0);
-    double inv_ksq = 1./(k*k);
+    double inv_ksq = 1./(omega*omega*MU0*EPS0);
  
     double dmax = 0.0;
 
@@ -136,13 +116,15 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
         for (const auto& jbf : bfs) {
             const auto& jTminus = msh.triangles[jbf.itminus];
             const auto& jTplus = msh.triangles[jbf.itplus];
-            bool split = num_shared_vertices(msh, ibf.edge_index, jbf.edge_index) != 0;
 
-            auto jqps_minus = split?
+            bool split_minus = (jbf.itminus == ibf.itminus) or (jbf.itminus == ibf.itplus);
+            bool split_plus = (jbf.itplus == ibf.itminus) or (jbf.itplus == ibf.itplus);
+
+            auto jqps_minus = split_minus?
                 integrate_subtri(msh, jTminus, cfg.degree) :
                 integrate(msh, jTminus, cfg.degree);
 
-            auto jqps_plus = split?
+            auto jqps_plus = split_plus?
                 integrate_subtri(msh, jTplus, cfg.degree) :
                 integrate(msh, jTplus, cfg.degree);
 
@@ -160,7 +142,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry += prodl * w * (v - s) * g; 
-                    dmax = std::max(dmax, 1./Rij);
+                    //dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -175,7 +157,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry -= prodl * w * (v - s) * g;
-                    dmax = std::max(dmax, 1./Rij);
+                    //dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -190,7 +172,7 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry -= prodl * w * (v - s) * g;
-                    dmax = std::max(dmax, 1./Rij);
+                    //dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -205,9 +187,88 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry += prodl * w * (v - s) * g;
-                    dmax = std::max(dmax, 1./Rij);
+                    //dmax = std::max(dmax, 1./Rij);
                 }
             }
+
+            Z(jbf.matrix_index, ibf.matrix_index) = entry;
+        } // for jbf
+    } // for ibf
+
+    std::cout<< "dmax = "<< dmax << "\n";
+}
+
+void
+compute_matrix_approx(const mesh& msh, const std::vector<basis_function>& bfs,
+    zdmatrix& Z, const config& cfg)
+{
+    double freq = cfg.frequency;
+    double omega = 2.0*M_PI*freq;
+    double k = omega*std::sqrt(MU0*EPS0);
+    double inv_ksq = 1./(omega*omega*MU0*EPS0);
+
+    double sqrt_4pi = std::sqrt(4*M_PI);
+ 
+    double dmax = 0.0;
+
+    for (const auto& ibf : bfs) {
+        const auto& iTminus = msh.triangles[ibf.itminus];
+        const auto& iTplus = msh.triangles[ibf.itplus];
+        auto iTminusbar = barycenter(msh, iTminus);
+        auto iTplusbar = barycenter(msh, iTplus);
+
+        for (const auto& jbf : bfs) {
+            const auto& jTminus = msh.triangles[jbf.itminus];
+            const auto& jTplus = msh.triangles[jbf.itplus];
+            auto jTminusbar = barycenter(msh, jTminus);
+            auto jTplusbar = barycenter(msh, jTplus);
+
+            bool selfmm = (ibf.itminus == jbf.itminus);
+            bool selfmp = (ibf.itminus == jbf.itplus);
+            bool selfpm = (ibf.itplus == jbf.itminus);
+            bool selfpp = (ibf.itplus == jbf.itplus);
+
+            auto sqrt_Am = std::sqrt(measure(msh, iTminus));
+            auto sqrt_Ap = std::sqrt(measure(msh, iTplus));
+            std::complex jk{0., k};
+
+            std::complex<double> entry = 0.0;
+
+            double rho_cmm = dot( ibf.rho_minus(iTminusbar), jbf.rho_minus(jTminusbar) );
+            double Rmm = norm(iTminusbar - jTminusbar);
+            std::complex<double> expmm{0, -k*Rmm};
+            std::complex<double> Gmm = std::exp(expmm)/(4.0*M_PI*Rmm);
+            if (selfmm) {
+                Gmm = 0.25*(sqrt_4pi/sqrt_Am - jk) * M_1_PI;
+            }
+            entry += ibf.length*jbf.length*(0.25*rho_cmm*Gmm - inv_ksq*Gmm);
+
+            double rho_cmp = dot( ibf.rho_minus(iTminusbar), jbf.rho_plus(jTplusbar) );
+            double Rmp = norm(iTminusbar - jTplusbar);
+            std::complex<double> expmp{0, -k*Rmp};
+            std::complex<double> Gmp = std::exp(expmp)/(4.0*M_PI*Rmp);
+            if (selfmp) {
+                Gmp = 0.25*(sqrt_4pi/sqrt_Am - jk) * M_1_PI;
+            }
+            entry -= ibf.length*jbf.length*(0.25*rho_cmp*Gmp - inv_ksq*Gmp);
+
+            double rho_cpm = dot( ibf.rho_plus(iTplusbar), jbf.rho_minus(jTminusbar) );
+            double Rpm = norm(iTplusbar - jTminusbar);
+            std::complex<double> exppm{0, -k*Rpm};
+            std::complex<double> Gpm = std::exp(exppm)/(4.0*M_PI*Rpm);
+            if (selfpm) {
+                Gpm = 0.25*(sqrt_4pi/sqrt_Ap - jk) * M_1_PI;
+            }
+            entry -= ibf.length*jbf.length*(0.25*rho_cpm*Gpm - inv_ksq*Gpm);
+
+            double rho_cpp = dot( ibf.rho_plus(iTplusbar), jbf.rho_plus(jTplusbar) );
+            double Rpp = norm(iTplusbar - jTplusbar);
+            std::complex<double> exppp{0, -k*Rpp};
+            std::complex<double> Gpp = std::exp(exppp)/(4.0*M_PI*Rpp);
+            if (selfpp) {
+                Gpp = 0.25*(sqrt_4pi/sqrt_Ap - jk) * M_1_PI;
+            }
+            entry += ibf.length*jbf.length*(0.25*rho_cpp*Gpp - inv_ksq*Gpp);
 
             Z(jbf.matrix_index, ibf.matrix_index) = entry;
         } // for jbf
@@ -224,6 +285,8 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
     double omega = 2.0*M_PI*freq;
     double wn = omega*std::sqrt(MU0*EPS0);
 
+    edvec3 E = {1.0, 0.0, 0.0};
+
     for (const auto& ibf : bfs) {
     
         if (not ibf.interface) {
@@ -233,16 +296,62 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
         auto itf_tag = ibf.interface.value();
         std::cout << "rhs: itf tag " << itf_tag << " idx " << ibf.matrix_index << "\n";
 
-        const auto& iTminus = msh.triangles[ibf.itminus];
-        const auto& iTplus = msh.triangles[ibf.itplus];
+        double val = 0.0;
+
+        const auto& Tminus = msh.triangles[ibf.itminus];
+        const auto& qpsminus = mommy::integrate(msh, Tminus, 1);
+        for (auto& qp : qpsminus) {
+            val += qp.w * E.dot(ibf.eval_minus(qp.p)); 
+        }
+
+
+        const auto& Tplus = msh.triangles[ibf.itplus];
+        const auto& qpsplus = mommy::integrate(msh, Tplus, 1);
+        for (auto& qp : qpsplus) {
+            val += qp.w * E.dot(ibf.eval_plus(qp.p)); 
+        }
+
+        auto e = msh.edges[ibf.edge_index];
+        auto bar = barycenter(msh, e);
+
+        std::cout << val << " " << ibf.rho_plus(bar) << std::endl;
 
         std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
 
-        b(ibf.matrix_index) = entry;
+        b(ibf.matrix_index) = entry;//std::complex<double>{0.0, -val/(omega*MU0)};
     }
 }
 
 } //namespace mommy
+
+
+static std::vector<std::string>
+split(const std::string& str) {
+    std::vector<std::string> tokens;
+
+    size_t first = 0;
+    size_t last = 0;
+
+    while (first < str.length()) {
+
+        while ( (first < str.length()) and str[first] == ':' ) {
+            first++;
+        }
+
+        last = first; 
+        while ( (last < str.length()) and str[last] != ':' ) {
+            last++;
+        }
+
+        if (last > first) {
+            tokens.push_back( str.substr(first, last - first) );
+        }
+
+        first = last+1;
+    }
+
+    return tokens;
+}
 
 int main(int argc, char **argv)
 {
@@ -253,10 +362,17 @@ int main(int argc, char **argv)
     mommy::config cfg;
     cfg.frequency = 0;
     cfg.degree = 2;
+    bool force_symmetry = false;
+    bool approx_matrix = false;
+
+    std::string range_expr;
 
     int opt;
-    while ((opt = getopt(argc, argv, "f:g:k:s:")) != -1) {
+    while ((opt = getopt(argc, argv, "Af:g:k:s:SR:")) != -1) {
         switch (opt) {
+        case 'A':
+            approx_matrix = true;
+            break;
         case 'f':
             cfg.frequency = std::stod(optarg);
             break;
@@ -269,6 +385,13 @@ int main(int argc, char **argv)
         case 's':
             silo_path = optarg;
             break;
+        case 'S':
+            force_symmetry = true;
+            break;
+        case 'R':
+            range_expr = optarg;
+            break;
+
         default:
             std::cerr << "Invalid argument\n";
             return EXIT_FAILURE;
@@ -302,6 +425,7 @@ int main(int argc, char **argv)
     mommy::silo db(silo_path);
     db.add_mesh("mesh", msh);
 
+    #if 0
     double l = 0.0;
     for (auto& be : msh.boundary_edges) {
         l += measure(msh, deref(msh.edges, be));
@@ -333,7 +457,7 @@ int main(int argc, char **argv)
         vals(i) = val;
     }
     db.add_variable("mesh", "vals", vals, mommy::var_centering::nodal);
-
+    #endif
     mommy::ddfield norms = mommy::ddfield::Zero(msh.triangles.size(), 3);
     for (size_t i = 0; i < msh.triangles.size(); i++) {
         norms.row(i) = normal(msh, msh.triangles[i]);
@@ -390,19 +514,84 @@ int main(int argc, char **argv)
     }
     #endif
 
+
+    if (range_expr != "") {
+        auto toks = split(range_expr);
+        double fstart = std::stod(toks[0]);
+        double step = std::stod(toks[1]);
+        double fend = std::stod(toks[2]);
+
+        std::ofstream ofs("zplot.txt");
+
+        for (double freq = fstart; freq <= fend; freq += step) {
+            cfg.frequency = freq;
+            auto system_size = mommy::num_internal_edges(msh);
+            mommy::zdmatrix Z = mommy::zdmatrix::Zero(system_size, system_size);
+            mommy::zdvector b = mommy::zdvector::Zero(system_size);
+
+            std::cout << "Assemblying linear system...\n";
+            const auto asm_start{std::chrono::steady_clock::now()};
+            if (approx_matrix) {
+                mommy::compute_matrix_approx(msh, bfs, Z, cfg);
+            } else {
+                mommy::compute_matrix(msh, bfs, Z, cfg);
+            }
+            mommy::compute_rhs(msh, bfs, b, cfg);
+            const auto asm_end{std::chrono::steady_clock::now()};
+            const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
+            std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
+            if (force_symmetry) {
+                Z = (Z+Z.transpose())/2.0;
+            }
+
+            std::cout << "Solving linear system...\n";
+            const auto start{std::chrono::steady_clock::now()};
+            mommy::zdvector x = Z.lu().solve(b);
+            const auto end{std::chrono::steady_clock::now()};
+            const std::chrono::duration<double> elapsed_seconds{end - start};
+            std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
+
+            std::complex<double> I = 0.0;
+            for (const auto& ibf : bfs) {
+                if (not ibf.interface) {
+                    continue;
+                }
+        
+                I += ibf.length*x(ibf.matrix_index);
+            }
+            auto z = 1./I;
+            
+            ofs << freq << " " << z.real() << " " << z.imag() << std::endl;
+
+        }
+
+        return 0;
+    }
+
+
     auto system_size = mommy::num_internal_edges(msh);
     
     mommy::zdmatrix Z = mommy::zdmatrix::Zero(system_size, system_size);
     mommy::zdvector b = mommy::zdvector::Zero(system_size);
 
-    //#if 0
     std::cout << "Assemblying linear system...\n";
     const auto asm_start{std::chrono::steady_clock::now()};
-    mommy::compute_matrix(msh, bfs, Z, cfg);
+    if (approx_matrix) {
+        mommy::compute_matrix_approx(msh, bfs, Z, cfg);
+    } else {
+        mommy::compute_matrix(msh, bfs, Z, cfg);
+    }
     mommy::compute_rhs(msh, bfs, b, cfg);
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
     std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
+    if (force_symmetry) {
+        Z = (Z+Z.transpose())/2.0;
+    }
+  
+    H5Easy::File file("mommy.h5", H5Easy::File::Truncate);
+    file.createDataSet("mommy/Z", Z);
+    file.createDataSet("mommy/b", b);
 
     std::cout << "Solving linear system...\n";
     const auto start{std::chrono::steady_clock::now()};
@@ -411,17 +600,15 @@ int main(int argc, char **argv)
     const std::chrono::duration<double> elapsed_seconds{end - start};
     std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
 
-    H5Easy::File file("mommy.h5", H5Easy::File::Truncate);
-    file.createDataSet("mommy/Z", Z);
-    file.createDataSet("mommy/b", b);
-    file.createDataSet("mommy/x", x);
-    //#endif
 
-    //mommy::ddvector x = prjtest(msh, bfs);
+    file.createDataSet("mommy/x", x);
+
 
     std::vector<double> data( msh.triangles.size() );
+    std::vector<double> datab( msh.triangles.size() );
 
     mommy::ddfield vdata = mommy::ddfield::Zero( msh.triangles.size(), 3 );
+    mommy::ddfield vdatab = mommy::ddfield::Zero( msh.triangles.size(), 3 );
 
     Eigen::Matrix<double, 3, 1> temp;
 
@@ -445,12 +632,42 @@ int main(int argc, char **argv)
         }
         vdata.row(ibf.itplus) += temp;
 
-        //data[ibf.itminus] += cminus;//cminus.dot(cminus).real();
-        //data[ibf.itplus] += cplus;//cplus.dot(cplus).real();
+        data[ibf.itminus] += std::sqrt(cminus.dot(cminus).real());
+        data[ibf.itplus] += std::sqrt(cplus.dot(cplus).real());
+
+        auto bminus = (ibf.eval_minus(bar_Tminus)*b(ibf.matrix_index)).eval();
+        auto bplus = (ibf.eval_plus(bar_Tplus)*b(ibf.matrix_index)).eval();
+        datab[ibf.itminus] += std::sqrt(bminus.dot(bminus).real());
+        datab[ibf.itplus] += std::sqrt(bplus.dot(bplus).real());
+
+        for (size_t i = 0; i < 3; i++) {
+            temp(i) = std::imag(bminus(i));
+        }
+        vdatab.row(ibf.itminus) += temp;
+
+        for (size_t i = 0; i < 3; i++) {
+            temp(i) = std::imag(bplus(i));
+        }
+        vdatab.row(ibf.itplus) += temp;
     }
 
+    std::complex<double> I = 0.0;
+    for (const auto& ibf : bfs) {
+    
+        if (not ibf.interface) {
+            continue;
+        }
+    
+        I += ibf.length*x(ibf.matrix_index);
+    }
+
+    std::cout << "Current: " << I << std::endl;
+    std::cout << "      Z: " << 1./I << std::endl;
+
     db.add_variable("mesh", "mag", data, mommy::var_centering::zonal);
+    db.add_variable("mesh", "src", datab, mommy::var_centering::zonal);
     db.add_variable("mesh", "J", vdata, mommy::var_centering::zonal);
+    db.add_variable("mesh", "srcV", vdatab, mommy::var_centering::zonal);
 
     return 0;
 }
