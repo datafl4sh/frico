@@ -687,41 +687,81 @@ int main(int argc, char **argv)
 
     db.add_variable("mesh", "J", tri_J, mommy::var_centering::zonal);
 
-    mommy::zdfield E = mommy::zdfield::Zero(360, 3);
+    mommy::zdfield Exy = mommy::zdfield::Zero(360, 3);
+    mommy::zdfield Eyz = mommy::zdfield::Zero(360, 3);
+    mommy::zdfield Exz = mommy::zdfield::Zero(360, 3);
+    
 
     double freq = cfg.frequency;
     double omega = 2.0*M_PI*freq;
     double k = omega*std::sqrt(MU0*EPS0);
     std::complex<double> jomega{0.0, omega};
 
+
+
     for (int deg = 0; deg < 360; deg++) {
         double theta = deg*M_PI/180;
-        mommy::point mpt { 2*std::cos(theta), 0.0, 2*std::sin(theta) };
+        double R = 2.0;
+        
         for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
             const auto& tri = msh.triangles[itri];
-            mommy::vec3 bar = mommy::barycenter(msh, tri);
-            double R = norm(mpt - bar);
-            std::complex<double> jkR{0, k*R};
-            std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
-            mommy::ezvec3 A = MU0*tri_AJ.row(itri)*g;
-            mommy::ezvec3 gradphi = -(1./jomega*EPS0)*tri_AdivJ(itri)*(1.0-jkR)*(mpt-bar).to_eigen()*g/(R*R);
-            E.row(deg) += -jomega*A - gradphi;
+            auto bar = barycenter(msh, tri);
+            mommy::ezvec3 J = tri_AJ.row(itri);
+            std::complex<double> divJ = tri_AdivJ(itri);
+
+            /* XY */ {
+                mommy::point Pxy{ R*std::cos(theta), R*std::sin(theta), 0.0 };
+                mommy::vec3 vR = Pxy - bar;
+                double R = norm(vR);
+                std::complex<double> jkR{0.0, k*R};
+                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+                Exy.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
+            }
+
+            /* YZ */ {
+                mommy::point Pyz{ 0.0, R*std::cos(theta), R*std::sin(theta) };
+                mommy::vec3 vR = Pyz - bar;
+                double R = norm(vR);
+                std::complex<double> jkR{0.0, k*R};
+                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+                Eyz.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
+            }
+
+            /* XZ */ {
+                mommy::point Pxz{ R*std::cos(theta), 0.0, -R*std::sin(theta) };
+                mommy::vec3 vR = Pxz - bar;
+                double R = norm(vR);
+                std::complex<double> jkR{0.0, k*R};
+                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+                Exz.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
+            }
         }
     }
-
-    double Emax = 0.0;
+    
+    double magExy_max = 0.0;
+    double magEyz_max = 0.0;
+    double magExz_max = 0.0;
     for (int i = 0; i < 360; i++) {
-        double magE = std::sqrt(std::real(E.row(i).dot(E.row(i))));
-        Emax = std::max(Emax, magE);
+        { double magExy = std::sqrt(std::real(Exy.row(i).dot(Exy.row(i))));
+          magExy_max = std::max(magExy_max, magExy); }
+        { double magEyz = std::sqrt(std::real(Eyz.row(i).dot(Eyz.row(i))));
+          magEyz_max = std::max(magEyz_max, magEyz); }
+        { double magExz = std::sqrt(std::real(Exz.row(i).dot(Exz.row(i))));
+          magExz_max = std::max(magExz_max, magExz); }
     }
 
     std::ofstream ofs("polar.txt");
     for (int i = 0; i < 360; i++) {
-        double magE = std::sqrt(std::real(E.row(i).dot(E.row(i))));
-        ofs << i << " " << magE << " " << 10*log10(magE/Emax) << std::endl;
+        double magExy = std::sqrt(std::real(Exy.row(i).dot(Exy.row(i))));
+        double magEyz = std::sqrt(std::real(Eyz.row(i).dot(Eyz.row(i))));
+        double magExz = std::sqrt(std::real(Exz.row(i).dot(Exz.row(i))));
+        ofs << i << " " << magExy << " " << 20*std::log10(magExy/magExy_max)
+                 << " " << magEyz << " " << 20*std::log10(magEyz/magEyz_max)
+                 << " " << magExz << " " << 20*std::log10(magExz/magExz_max)
+                 << std::endl;
     }
 
-
+    
     mommy::mesh samplingsphere;
     //make_sampling_sphere(samplingsphere, {0,0,0}, 0.75, 0.05);
     make_sampling_rectangle(samplingsphere, {0,0,0}, 0.025);
@@ -740,7 +780,7 @@ int main(int argc, char **argv)
             std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
             mommy::ezvec3 J = tri_AJ.row(itri);
             std::complex<double> divJ = tri_AdivJ(itri);
-            locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R));
+            locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
         }
         sEmag[i] = std::sqrt(std::real(locE.dot(locE)));
         vEmag.row(i) = locE;
@@ -750,7 +790,8 @@ int main(int argc, char **argv)
     db.add_mesh("sampling", samplingsphere);
     db.add_variable("sampling", "magE", sEmag, mommy::var_centering::nodal);
     db.add_variable("sampling", "E", vEmag, mommy::var_centering::nodal);
-
+    
+    
     for (int i = 0; i < 100; i++) {
         std::string stepfname = "step_";
         stepfname = stepfname + std::to_string(i) + ".silo";
@@ -763,7 +804,7 @@ int main(int argc, char **argv)
         db2.add_mesh("sampling", samplingsphere);
         db2.add_variable("sampling", "E", E, mommy::var_centering::nodal);
     }
-
+    
 
     std::complex<double> I = 0.0;
     for (const auto& ibf : bfs) {
