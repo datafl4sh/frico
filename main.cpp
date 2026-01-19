@@ -668,13 +668,25 @@ int main(int argc, char **argv)
 
     mommy::zdfield E = mommy::zdfield::Zero(360, 3);
 
-    for (int theta = 0; theta < 360; theta++) {
+    double freq = cfg.frequency;
+    double omega = 2.0*M_PI*freq;
+    double k = omega*std::sqrt(MU0*EPS0);
+    for (int deg = 0; deg < 360; deg++) {
+        double theta = deg*M_PI/180;
         mommy::edvec3 locE = mommy::edvec3::Zero();
         mommy::point mpt { 2*std::cos(theta), 2*std::sin(theta), 0.0 };
         for (auto& tri : msh.triangles) {
             auto bar = mommy::barycenter(msh, tri);
-            auto R = mpt - bar;
+            auto R = norm(mpt - bar);
+            std::complex<double> exponent{0, -k*R};
+            E.row(deg) += MU0*std::complex<double>{0, -omega}*tri_AJ*std::exp(exponent)/(4*M_PI*R);
         }
+    }
+
+    std::ofstream ofs("polar.txt");
+    for (int i = 0; i < 360; i++) {
+        std::complex<double> magE = E.row(i).dot(E.row(i));
+        ofs << i << " " << std::abs(magE) << std::endl;
     }
 
     std::complex<double> I = 0.0;
