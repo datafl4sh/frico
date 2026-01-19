@@ -123,8 +123,6 @@ silo::add_mesh(const std::string& name, const mesh& msh)
         return false;
     }
 
-    std::cout << name.c_str() << std::endl;
-
     if ( DBPutUcdmesh(db_, name.c_str(), ndims, NULL, coords, nnodes,
             nzones, zlname.c_str(), NULL, DB_DOUBLE, NULL) < 0 ) {
         std::cerr << "DBPutUcdmesh() failed\n";

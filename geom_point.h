@@ -24,6 +24,7 @@
 #include <iostream>
 #include <cmath>
 
+#include <Eigen/Dense>
 namespace mommy {
 
 class vec3
@@ -91,6 +92,10 @@ public:
 
     vec3 operator/(double s) const {
         return { x_ / s, y_ / s, z_ / s };
+    }
+
+    Eigen::Matrix<double, 3, 1> to_eigen() const {
+        return {x_, y_, z_};
     }
 };
 

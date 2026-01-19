@@ -104,8 +104,6 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
     double omega = 2.0*M_PI*freq;
     double k = omega*std::sqrt(MU0*EPS0);
     double inv_ksq = 1./(omega*omega*MU0*EPS0);
- 
-    double dmax = 0.0;
 
     for (const auto& ibf : bfs) {
         const auto& iTminus = msh.triangles[ibf.itminus];
@@ -142,7 +140,6 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry += prodl * w * (v - s) * g; 
-                    //dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -157,7 +154,6 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry -= prodl * w * (v - s) * g;
-                    //dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -172,7 +168,6 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry -= prodl * w * (v - s) * g;
-                    //dmax = std::max(dmax, 1./Rij);
                 }
             }
 
@@ -187,15 +182,12 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                     std::complex<double> exponent{0, -k*Rij};
                     std::complex<double> g = std::exp(exponent)/Rij;
                     entry += prodl * w * (v - s) * g;
-                    //dmax = std::max(dmax, 1./Rij);
                 }
             }
 
             Z(jbf.matrix_index, ibf.matrix_index) = entry;
         } // for jbf
     } // for ibf
-
-    std::cout<< "dmax = "<< dmax << "\n";
 }
 
 void
@@ -371,10 +363,36 @@ bool make_sampling_sphere(mommy::mesh& msh, const mommy::point& center, double r
     gmsh::model::getEntities(vp);
     gmsh::model::mesh::setSize(vp, h);
     gmsh::model::mesh::generate(2);
-    gmsh::model::mesh::setOrder(1);
+    //gmsh::model::mesh::setOrder(1);
 
     mommy::load_mesh_from_gmsh(msh);
 
+    gmsh::clear();
+    gmsh::finalize();
+    return true;
+}
+
+bool make_sampling_rectangle(mommy::mesh& msh, const mommy::point& center, double h)
+{
+    gmsh::initialize();
+
+    gmsh::model::add("sampling");
+
+    //gmsh::model::occ::addCircle(center.x(), center.y(), center.z(), r);
+    gmsh::model::occ::addRectangle(-5, -5, 0.0, 10, 10);
+
+    gmsh::model::occ::synchronize();
+
+    gmsh::vectorpair vp;
+    gmsh::model::getEntities(vp);
+    gmsh::model::mesh::setSize(vp, h);
+
+    gmsh::model::mesh::generate(2);
+    //gmsh::model::mesh::setOrder(1);
+
+    mommy::load_mesh_from_gmsh(msh);
+
+    gmsh::clear();
     gmsh::finalize();
     return true;
 }
@@ -444,6 +462,7 @@ int main(int argc, char **argv)
 
     mommy::mesh msh;
     mommy::load_mesh_from_gmsh(msh);
+    gmsh::clear();
     gmsh::finalize();
 
     std::cout << msh.vertices.size() << " " << msh.triangles.size() << std::endl;
@@ -683,8 +702,10 @@ int main(int argc, char **argv)
             mommy::vec3 bar = mommy::barycenter(msh, tri);
             double R = norm(mpt - bar);
             std::complex<double> jkR{0, k*R};
-            mommy::ezvec3 A = MU0*tri_AJ.row(itri)*(std::exp(-jkR)/(4*M_PI*R));
-            E.row(deg) += -jomega*A;
+            std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+            mommy::ezvec3 A = MU0*tri_AJ.row(itri)*g;
+            mommy::ezvec3 gradphi = -(1./jomega*EPS0)*tri_AdivJ(itri)*(1.0-jkR)*(mpt-bar).to_eigen()*g/(R*R);
+            E.row(deg) += -jomega*A - gradphi;
         }
     }
 
@@ -702,10 +723,12 @@ int main(int argc, char **argv)
 
 
     mommy::mesh samplingsphere;
-    make_sampling_sphere(samplingsphere, {0,0,0}, 2, 0.1);
+    //make_sampling_sphere(samplingsphere, {0,0,0}, 0.75, 0.05);
+    make_sampling_rectangle(samplingsphere, {0,0,0}, 0.025);
     auto nspoints = samplingsphere.vertices.size();
-    std::vector<double> sEmag;
-    sEmag.resize( nspoints );
+    std::vector<double> sEmag( nspoints );
+    mommy::zdfield vEmag = mommy::zdfield::Zero( nspoints, 3 );
+    std::cout << "postpro begin\n";
     for (size_t i = 0; i < nspoints; i++) {
         const auto& spt = samplingsphere.vertices[i]; 
         mommy::ezvec3 locE = mommy::ezvec3::Zero();
@@ -714,14 +737,32 @@ int main(int argc, char **argv)
             mommy::vec3 bar = mommy::barycenter(msh, tri);
             double R = norm(spt - bar);
             std::complex<double> jkR{0, k*R};
-            mommy::ezvec3 A = MU0*tri_AJ.row(itri)*(std::exp(-jkR)/(4*M_PI*R));
-            locE += -jomega*A;
+            std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+            mommy::ezvec3 J = tri_AJ.row(itri);
+            std::complex<double> divJ = tri_AdivJ(itri);
+            locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R));
         }
         sEmag[i] = std::sqrt(std::real(locE.dot(locE)));
+        vEmag.row(i) = locE;
     }
+    std::cout << "postpro end\n";
 
     db.add_mesh("sampling", samplingsphere);
     db.add_variable("sampling", "magE", sEmag, mommy::var_centering::nodal);
+    db.add_variable("sampling", "E", vEmag, mommy::var_centering::nodal);
+
+    for (int i = 0; i < 100; i++) {
+        std::string stepfname = "step_";
+        stepfname = stepfname + std::to_string(i) + ".silo";
+        mommy::silo db2(stepfname);
+
+        auto dT = i*(1./cfg.frequency)/100.0;
+
+        mommy::ddfield E = (vEmag*std::exp(jomega*dT)).real();
+
+        db2.add_mesh("sampling", samplingsphere);
+        db2.add_variable("sampling", "E", E, mommy::var_centering::nodal);
+    }
 
 
     std::complex<double> I = 0.0;
