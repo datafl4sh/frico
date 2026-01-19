@@ -560,8 +560,11 @@ int main(int argc, char **argv)
                 I += ibf.length*x(ibf.matrix_index);
             }
             auto z = 1./I;
+
+            std::complex<double> gamma = (z - 50.0)/(z + 50.0);
+            double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
             
-            ofs << freq << " " << z.real() << " " << z.imag() << std::endl;
+            ofs << freq << " " << z.real() << " " << z.imag() << " " << swr << std::endl;
 
         }
 
@@ -607,6 +610,9 @@ int main(int argc, char **argv)
     std::vector<double> data( msh.triangles.size() );
     std::vector<double> datab( msh.triangles.size() );
 
+    mommy::zdfield tri_AJ = mommy::zdfield::Zero(msh.triangles.size(), 3);
+    mommy::zdvector tri_AdivJ = mommy::zdvector::Zero(msh.triangles.size());
+
     mommy::ddfield vdata = mommy::ddfield::Zero( msh.triangles.size(), 3 );
     mommy::ddfield vdatab = mommy::ddfield::Zero( msh.triangles.size(), 3 );
 
@@ -619,6 +625,15 @@ int main(int argc, char **argv)
 
         auto bar_Tminus = barycenter(msh, Tminus);
         auto bar_Tplus = barycenter(msh, Tplus);
+
+        auto A_Tminus = mommy::measure(msh, Tminus);
+        auto A_Tplus = mommy::measure(msh, Tplus);
+
+        tri_AJ.row(ibf.itminus) += A_Tminus * ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index);
+        tri_AJ.row(ibf.itplus) += A_Tplus * ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index);
+
+        tri_AdivJ(ibf.itminus) += A_Tminus * ibf.div_minus(bar_Tminus)*x(ibf.matrix_index);
+        tri_AdivJ(ibf.itplus) += A_Tplus * ibf.div_plus(bar_Tplus)*x(ibf.matrix_index);
 
         auto cminus = (ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index)).eval();
         for (size_t i = 0; i < 3; i++) {
@@ -651,6 +666,17 @@ int main(int argc, char **argv)
         vdatab.row(ibf.itplus) += temp;
     }
 
+    mommy::zdfield E = mommy::zdfield::Zero(360, 3);
+
+    for (int theta = 0; theta < 360; theta++) {
+        mommy::edvec3 locE = mommy::edvec3::Zero();
+        mommy::point mpt { 2*std::cos(theta), 2*std::sin(theta), 0.0 };
+        for (auto& tri : msh.triangles) {
+            auto bar = mommy::barycenter(msh, tri);
+            auto R = mpt - bar;
+        }
+    }
+
     std::complex<double> I = 0.0;
     for (const auto& ibf : bfs) {
     
@@ -661,8 +687,11 @@ int main(int argc, char **argv)
         I += ibf.length*x(ibf.matrix_index);
     }
 
-    std::cout << "Current: " << I << std::endl;
-    std::cout << "      Z: " << 1./I << std::endl;
+    auto z = 1./I;
+    std::complex<double> gamma = (z - 50.0)/(z + 50.0);
+    double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
+    std::cout << "Impedance: " << z << std::endl;
+    std::cout << "      SWR: " << swr << std::endl;
 
     db.add_variable("mesh", "mag", data, mommy::var_centering::zonal);
     db.add_variable("mesh", "src", datab, mommy::var_centering::zonal);

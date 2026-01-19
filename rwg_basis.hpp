@@ -56,6 +56,9 @@ struct basis_function
 
     edvec3 eval_minus(const point& r) const;
     edvec3 eval_plus(const point& r) const;
+
+    double div_minus(const point& r) const;
+    double div_plus(const point& r) const;
 };
 
 inline vec3
@@ -82,6 +85,18 @@ basis_function::eval_plus(const point& r) const
 {
     auto f = length*rho_plus(r)/(2.0*Aplus);
     return { f.x(), f.y(), f.z() };
+}
+
+inline double
+basis_function::div_minus(const point& r) const
+{
+    return -length/(2.0*Aminus);
+}
+
+inline double
+basis_function::div_plus(const point& r) const
+{
+    return length/(2.0*Aplus);
 }
 
 inline std::ostream&
