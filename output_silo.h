@@ -71,6 +71,12 @@ public:
         var_centering centering
     );
 
+    bool add_variable(const std::string& mesh_name,
+        const std::string& var_name,
+        Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 3>& var,
+        var_centering centering
+    );
+
     ~silo();
 };
 

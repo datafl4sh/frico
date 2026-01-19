@@ -353,6 +353,32 @@ split(const std::string& str) {
     return tokens;
 }
 
+bool make_sampling_sphere(mommy::mesh& msh, const mommy::point& center, double r, double h)
+{
+    gmsh::initialize();
+
+    gmsh::model::add("sampling");
+
+    std::vector<std::pair<int,int>> objects;
+    objects.push_back(
+        std::pair(3, gmsh::model::occ::addSphere(
+            center.x(), center.y(), center.z(), r))
+    );
+
+    gmsh::model::occ::synchronize();
+
+    gmsh::vectorpair vp;
+    gmsh::model::getEntities(vp);
+    gmsh::model::mesh::setSize(vp, h);
+    gmsh::model::mesh::generate(2);
+    gmsh::model::mesh::setOrder(1);
+
+    mommy::load_mesh_from_gmsh(msh);
+
+    gmsh::finalize();
+    return true;
+}
+
 int main(int argc, char **argv)
 {
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
@@ -612,9 +638,7 @@ int main(int argc, char **argv)
 
     mommy::zdfield tri_AJ = mommy::zdfield::Zero(msh.triangles.size(), 3);
     mommy::zdvector tri_AdivJ = mommy::zdvector::Zero(msh.triangles.size());
-
-    mommy::ddfield vdata = mommy::ddfield::Zero( msh.triangles.size(), 3 );
-    mommy::ddfield vdatab = mommy::ddfield::Zero( msh.triangles.size(), 3 );
+    mommy::zdfield tri_J = mommy::ddfield::Zero( msh.triangles.size(), 3 );
 
     Eigen::Matrix<double, 3, 1> temp;
 
@@ -629,65 +653,76 @@ int main(int argc, char **argv)
         auto A_Tminus = mommy::measure(msh, Tminus);
         auto A_Tplus = mommy::measure(msh, Tplus);
 
-        tri_AJ.row(ibf.itminus) += A_Tminus * ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index);
-        tri_AJ.row(ibf.itplus) += A_Tplus * ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index);
+        mommy::ezvec3 Jminus = ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index);
+        mommy::ezvec3 Jplus = ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index);
+
+        tri_AJ.row(ibf.itminus) += A_Tminus * Jminus;
+        tri_AJ.row(ibf.itplus) += A_Tplus * Jplus;
 
         tri_AdivJ(ibf.itminus) += A_Tminus * ibf.div_minus(bar_Tminus)*x(ibf.matrix_index);
         tri_AdivJ(ibf.itplus) += A_Tplus * ibf.div_plus(bar_Tplus)*x(ibf.matrix_index);
 
-        auto cminus = (ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index)).eval();
-        for (size_t i = 0; i < 3; i++) {
-            temp(i) = std::real(cminus(i));
-        }
-        vdata.row(ibf.itminus) += temp;
-
-        auto cplus = (ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index)).eval();
-        for (size_t i = 0; i < 3; i++) {
-            temp(i) = std::real(cplus(i));
-        }
-        vdata.row(ibf.itplus) += temp;
-
-        data[ibf.itminus] += std::sqrt(cminus.dot(cminus).real());
-        data[ibf.itplus] += std::sqrt(cplus.dot(cplus).real());
-
-        auto bminus = (ibf.eval_minus(bar_Tminus)*b(ibf.matrix_index)).eval();
-        auto bplus = (ibf.eval_plus(bar_Tplus)*b(ibf.matrix_index)).eval();
-        datab[ibf.itminus] += std::sqrt(bminus.dot(bminus).real());
-        datab[ibf.itplus] += std::sqrt(bplus.dot(bplus).real());
-
-        for (size_t i = 0; i < 3; i++) {
-            temp(i) = std::imag(bminus(i));
-        }
-        vdatab.row(ibf.itminus) += temp;
-
-        for (size_t i = 0; i < 3; i++) {
-            temp(i) = std::imag(bplus(i));
-        }
-        vdatab.row(ibf.itplus) += temp;
+        tri_J.row(ibf.itminus) += Jminus;
+        tri_J.row(ibf.itplus) += Jplus;
     }
+
+    db.add_variable("mesh", "J", tri_J, mommy::var_centering::zonal);
 
     mommy::zdfield E = mommy::zdfield::Zero(360, 3);
 
     double freq = cfg.frequency;
     double omega = 2.0*M_PI*freq;
     double k = omega*std::sqrt(MU0*EPS0);
+    std::complex<double> jomega{0.0, omega};
+
     for (int deg = 0; deg < 360; deg++) {
         double theta = deg*M_PI/180;
-        mommy::edvec3 locE = mommy::edvec3::Zero();
-        mommy::point mpt { 2*std::cos(theta), 2*std::sin(theta), 0.0 };
-        for (auto& tri : msh.triangles) {
-            auto bar = mommy::barycenter(msh, tri);
-            auto R = norm(mpt - bar);
-            std::complex<double> exponent{0, -k*R};
-            E.row(deg) += MU0*std::complex<double>{0, -omega}*tri_AJ*std::exp(exponent)/(4*M_PI*R);
+        mommy::point mpt { 2*std::cos(theta), 0.0, 2*std::sin(theta) };
+        for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+            const auto& tri = msh.triangles[itri];
+            mommy::vec3 bar = mommy::barycenter(msh, tri);
+            double R = norm(mpt - bar);
+            std::complex<double> jkR{0, k*R};
+            mommy::ezvec3 A = MU0*tri_AJ.row(itri)*(std::exp(-jkR)/(4*M_PI*R));
+            E.row(deg) += -jomega*A;
         }
+    }
+
+    double Emax = 0.0;
+    for (int i = 0; i < 360; i++) {
+        double magE = std::sqrt(std::real(E.row(i).dot(E.row(i))));
+        Emax = std::max(Emax, magE);
     }
 
     std::ofstream ofs("polar.txt");
     for (int i = 0; i < 360; i++) {
-        std::complex<double> magE = E.row(i).dot(E.row(i));
-        ofs << i << " " << std::abs(magE) << std::endl;
+        double magE = std::sqrt(std::real(E.row(i).dot(E.row(i))));
+        ofs << i << " " << magE << " " << 10*log10(magE/Emax) << std::endl;
     }
+
+
+    mommy::mesh samplingsphere;
+    make_sampling_sphere(samplingsphere, {0,0,0}, 2, 0.1);
+    auto nspoints = samplingsphere.vertices.size();
+    std::vector<double> sEmag;
+    sEmag.resize( nspoints );
+    for (size_t i = 0; i < nspoints; i++) {
+        const auto& spt = samplingsphere.vertices[i]; 
+        mommy::ezvec3 locE = mommy::ezvec3::Zero();
+        for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+            const auto& tri = msh.triangles[itri];
+            mommy::vec3 bar = mommy::barycenter(msh, tri);
+            double R = norm(spt - bar);
+            std::complex<double> jkR{0, k*R};
+            mommy::ezvec3 A = MU0*tri_AJ.row(itri)*(std::exp(-jkR)/(4*M_PI*R));
+            locE += -jomega*A;
+        }
+        sEmag[i] = std::sqrt(std::real(locE.dot(locE)));
+    }
+
+    db.add_mesh("sampling", samplingsphere);
+    db.add_variable("sampling", "magE", sEmag, mommy::var_centering::nodal);
+
 
     std::complex<double> I = 0.0;
     for (const auto& ibf : bfs) {
@@ -704,11 +739,6 @@ int main(int argc, char **argv)
     double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
     std::cout << "Impedance: " << z << std::endl;
     std::cout << "      SWR: " << swr << std::endl;
-
-    db.add_variable("mesh", "mag", data, mommy::var_centering::zonal);
-    db.add_variable("mesh", "src", datab, mommy::var_centering::zonal);
-    db.add_variable("mesh", "J", vdata, mommy::var_centering::zonal);
-    db.add_variable("mesh", "srcV", vdatab, mommy::var_centering::zonal);
 
     return 0;
 }

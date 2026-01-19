@@ -19,6 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <complex>
 #include <cassert>
 #include "output_silo.h"
 
@@ -222,6 +223,34 @@ silo::add_variable(const std::string& mesh_name,
     std::string defname = var_name + "defs";
     DBPutDefvars(db_, defname.c_str(), 1, names, types, defs, NULL);
 
+    return true;
+}
+
+bool
+silo::add_variable(const std::string& mesh_name,
+    const std::string& var_name,
+    Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 3>& var,
+    var_centering centering)
+{
+    /* Real part */
+    Eigen::Matrix<double, Eigen::Dynamic, 3> real = var.real();
+    std::string vname_re = var_name + "_real";
+    add_variable(mesh_name, vname_re, real, centering);
+    
+    /* Imaginary part */
+    Eigen::Matrix<double, Eigen::Dynamic, 3> imag = var.imag();
+    std::string vname_im = var_name + "_imag";
+    add_variable(mesh_name, vname_im, imag, centering);
+    
+    /* Magnitude */
+    Eigen::Matrix<double, Eigen::Dynamic, 1> abs =
+        Eigen::Matrix<double, Eigen::Dynamic, 1>::Zero(var.rows());
+    for (size_t i = 0; i < var.rows(); i++) {
+        Eigen::Matrix<std::complex<double>, 3, 1> r = var.row(i);
+        abs(i) = std::sqrt( r.dot(r).real() );
+    }
+    std::string vname_mag = var_name + "_mag";
+    add_variable(mesh_name, vname_mag, abs, centering);
     return true;
 }
 
