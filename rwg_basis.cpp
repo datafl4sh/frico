@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -22,7 +22,7 @@
 
 #include "rwg_basis.hpp"
 
-namespace mommy {
+namespace frico {
 
 void make_function_space(const mesh& msh, std::vector<basis_function>& bfs)
 {
@@ -67,4 +67,4 @@ void make_function_space(const mesh& msh, std::vector<basis_function>& bfs)
     }
 }
 
-} // namespace mommy
+} // namespace frico

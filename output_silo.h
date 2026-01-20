@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -28,7 +28,7 @@
 #include "geom_mesh.h"
 #include "silo.h"
 
-namespace mommy {
+namespace frico {
 
 enum class var_centering {
     nodal,
@@ -80,4 +80,4 @@ public:
     ~silo();
 };
 
-} // namespace mommy
+} // namespace frico

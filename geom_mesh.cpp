@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -25,7 +25,7 @@
 
 #include "geom_mesh.h"
 
-namespace mommy {
+namespace frico {
 
 std::array<point, 2>
 points(const mesh& msh, const edge& e)
@@ -113,4 +113,4 @@ num_internal_edges(const mesh& msh)
     return count;
 }
 
-} // namespace mommy
+} // namespace frico

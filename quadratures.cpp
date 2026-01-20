@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -36,7 +36,7 @@
 
 #include "quadratures.h"
 
-namespace mommy {
+namespace frico {
 
 static double
 area_triangle_kahan(const point& p0, const point& p1, const point& p2)
@@ -2701,4 +2701,4 @@ integrate_subtri(const mesh& msh, const triangle& t, size_t degree)
     return ret;
 }
 
-} //namespace mommy
+} //namespace frico

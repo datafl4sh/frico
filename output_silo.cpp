@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -23,7 +23,7 @@
 #include <cassert>
 #include "output_silo.h"
 
-namespace mommy {
+namespace frico {
 
 silo::silo()
     : db_(nullptr)
@@ -257,4 +257,4 @@ silo::~silo()
     close();
 }
 
-} // namespace mommy
+} // namespace frico

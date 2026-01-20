@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -38,7 +38,7 @@
 
 #define MU0     1.256637061435917e-06
 #define EPS0    8.8541878188e-12
-namespace mommy {
+namespace frico {
 
 struct config
 {
@@ -291,14 +291,14 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
         double val = 0.0;
 
         const auto& Tminus = msh.triangles[ibf.itminus];
-        const auto& qpsminus = mommy::integrate(msh, Tminus, 1);
+        const auto& qpsminus = frico::integrate(msh, Tminus, 1);
         for (auto& qp : qpsminus) {
             val += qp.w * E.dot(ibf.eval_minus(qp.p)); 
         }
 
 
         const auto& Tplus = msh.triangles[ibf.itplus];
-        const auto& qpsplus = mommy::integrate(msh, Tplus, 1);
+        const auto& qpsplus = frico::integrate(msh, Tplus, 1);
         for (auto& qp : qpsplus) {
             val += qp.w * E.dot(ibf.eval_plus(qp.p)); 
         }
@@ -314,7 +314,7 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
     }
 }
 
-} //namespace mommy
+} //namespace frico
 
 
 static std::vector<std::string>
@@ -345,7 +345,7 @@ split(const std::string& str) {
     return tokens;
 }
 
-bool make_sampling_sphere(mommy::mesh& msh, const mommy::point& center, double r, double h)
+bool make_sampling_sphere(frico::mesh& msh, const frico::point& center, double r, double h)
 {
     gmsh::initialize();
 
@@ -365,14 +365,14 @@ bool make_sampling_sphere(mommy::mesh& msh, const mommy::point& center, double r
     gmsh::model::mesh::generate(2);
     //gmsh::model::mesh::setOrder(1);
 
-    mommy::load_mesh_from_gmsh(msh);
+    frico::load_mesh_from_gmsh(msh);
 
     gmsh::clear();
     gmsh::finalize();
     return true;
 }
 
-bool make_sampling_rectangle(mommy::mesh& msh, const mommy::point& center, double h)
+bool make_sampling_rectangle(frico::mesh& msh, const frico::point& center, double h)
 {
     gmsh::initialize();
 
@@ -390,7 +390,7 @@ bool make_sampling_rectangle(mommy::mesh& msh, const mommy::point& center, doubl
     gmsh::model::mesh::generate(2);
     //gmsh::model::mesh::setOrder(1);
 
-    mommy::load_mesh_from_gmsh(msh);
+    frico::load_mesh_from_gmsh(msh);
 
     gmsh::clear();
     gmsh::finalize();
@@ -403,7 +403,7 @@ int main(int argc, char **argv)
 
     const char *gmsh_geo_path = nullptr;
     const char *silo_path = "test.silo";
-    mommy::config cfg;
+    frico::config cfg;
     cfg.frequency = 0;
     cfg.degree = 2;
     bool force_symmetry = false;
@@ -460,14 +460,14 @@ int main(int argc, char **argv)
     gmsh::model::mesh::generate(2);
     gmsh::model::mesh::setOrder(1);
 
-    mommy::mesh msh;
-    mommy::load_mesh_from_gmsh(msh);
+    frico::mesh msh;
+    frico::load_mesh_from_gmsh(msh);
     gmsh::clear();
     gmsh::finalize();
 
     std::cout << msh.vertices.size() << " " << msh.triangles.size() << std::endl;
 
-    mommy::silo db(silo_path);
+    frico::silo db(silo_path);
     db.add_mesh("mesh", msh);
 
     #if 0
@@ -493,29 +493,29 @@ int main(int argc, char **argv)
         test.push_back(i);
     }
 
-    db.add_variable("mesh", "test", test, mommy::var_centering::zonal);
+    db.add_variable("mesh", "test", test, frico::var_centering::zonal);
 
-    mommy::ddvector vals = mommy::ddvector::Zero(msh.vertices.size());
+    frico::ddvector vals = frico::ddvector::Zero(msh.vertices.size());
     for (size_t i = 0; i < msh.vertices.size(); i++) {
         const auto& vtx = msh.vertices[i];
         auto val = std::sin(M_PI*vtx.x())*std::sin(M_PI*vtx.y());
         vals(i) = val;
     }
-    db.add_variable("mesh", "vals", vals, mommy::var_centering::nodal);
+    db.add_variable("mesh", "vals", vals, frico::var_centering::nodal);
     #endif
-    mommy::ddfield norms = mommy::ddfield::Zero(msh.triangles.size(), 3);
+    frico::ddfield norms = frico::ddfield::Zero(msh.triangles.size(), 3);
     for (size_t i = 0; i < msh.triangles.size(); i++) {
         norms.row(i) = normal(msh, msh.triangles[i]);
     }
-    db.add_variable("mesh", "normals", norms, mommy::var_centering::zonal);
+    db.add_variable("mesh", "normals", norms, frico::var_centering::zonal);
 
     std::cout << "Vertices: " << msh.vertices.size() << std::endl;
     std::cout << "Edges:    " << msh.edges.size() << std::endl;
     std::cout << "Cells:    " << msh.triangles.size() << std::endl;
-    std::cout << "IntEdges: " << mommy::num_internal_edges(msh) << std::endl;
+    std::cout << "IntEdges: " << frico::num_internal_edges(msh) << std::endl;
 
-    std::vector<mommy::basis_function> bfs;
-    mommy::make_function_space(msh, bfs);
+    std::vector<frico::basis_function> bfs;
+    frico::make_function_space(msh, bfs);
 
     #if 0
     for (size_t itri = 0; itri < msh.tbis.size(); itri++) {
@@ -543,7 +543,7 @@ int main(int argc, char **argv)
 
         std::string fname = "debug/basis_" + std::to_string(bf.edge_index) + "_minus.dat";
         std::ofstream ofs_minus(fname);
-        auto qpsminus = mommy::integrate(msh, Tminus, 8);
+        auto qpsminus = frico::integrate(msh, Tminus, 8);
         for (const auto& qp : qpsminus) {
             auto rho = bf.eval_minus(qp.p);
             ofs_minus << qp.p.x() << " " << qp.p.y() << " " << rho(0) << " " << rho(1) << "\n";
@@ -551,7 +551,7 @@ int main(int argc, char **argv)
 
         fname = "debug/basis_" + std::to_string(bf.edge_index) + "_plus.dat";
         std::ofstream ofs_plus(fname);
-        auto qpsplus = mommy::integrate(msh, Tplus, 8);
+        auto qpsplus = frico::integrate(msh, Tplus, 8);
         for (const auto& qp : qpsplus) {
             auto rho = bf.eval_plus(qp.p);
             ofs_plus << qp.p.x() << " " << qp.p.y() << " " << rho(0) << " " << rho(1) << "\n";
@@ -570,18 +570,18 @@ int main(int argc, char **argv)
 
         for (double freq = fstart; freq <= fend; freq += step) {
             cfg.frequency = freq;
-            auto system_size = mommy::num_internal_edges(msh);
-            mommy::zdmatrix Z = mommy::zdmatrix::Zero(system_size, system_size);
-            mommy::zdvector b = mommy::zdvector::Zero(system_size);
+            auto system_size = frico::num_internal_edges(msh);
+            frico::zdmatrix Z = frico::zdmatrix::Zero(system_size, system_size);
+            frico::zdvector b = frico::zdvector::Zero(system_size);
 
             std::cout << "Assemblying linear system...\n";
             const auto asm_start{std::chrono::steady_clock::now()};
             if (approx_matrix) {
-                mommy::compute_matrix_approx(msh, bfs, Z, cfg);
+                frico::compute_matrix_approx(msh, bfs, Z, cfg);
             } else {
-                mommy::compute_matrix(msh, bfs, Z, cfg);
+                frico::compute_matrix(msh, bfs, Z, cfg);
             }
-            mommy::compute_rhs(msh, bfs, b, cfg);
+            frico::compute_rhs(msh, bfs, b, cfg);
             const auto asm_end{std::chrono::steady_clock::now()};
             const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
             std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
@@ -591,7 +591,7 @@ int main(int argc, char **argv)
 
             std::cout << "Solving linear system...\n";
             const auto start{std::chrono::steady_clock::now()};
-            mommy::zdvector x = Z.lu().solve(b);
+            frico::zdvector x = Z.lu().solve(b);
             const auto end{std::chrono::steady_clock::now()};
             const std::chrono::duration<double> elapsed_seconds{end - start};
             std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
@@ -617,19 +617,19 @@ int main(int argc, char **argv)
     }
 
 
-    auto system_size = mommy::num_internal_edges(msh);
+    auto system_size = frico::num_internal_edges(msh);
     
-    mommy::zdmatrix Z = mommy::zdmatrix::Zero(system_size, system_size);
-    mommy::zdvector b = mommy::zdvector::Zero(system_size);
+    frico::zdmatrix Z = frico::zdmatrix::Zero(system_size, system_size);
+    frico::zdvector b = frico::zdvector::Zero(system_size);
 
     std::cout << "Assemblying linear system...\n";
     const auto asm_start{std::chrono::steady_clock::now()};
     if (approx_matrix) {
-        mommy::compute_matrix_approx(msh, bfs, Z, cfg);
+        frico::compute_matrix_approx(msh, bfs, Z, cfg);
     } else {
-        mommy::compute_matrix(msh, bfs, Z, cfg);
+        frico::compute_matrix(msh, bfs, Z, cfg);
     }
-    mommy::compute_rhs(msh, bfs, b, cfg);
+    frico::compute_rhs(msh, bfs, b, cfg);
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
     std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
@@ -637,27 +637,27 @@ int main(int argc, char **argv)
         Z = (Z+Z.transpose())/2.0;
     }
   
-    H5Easy::File file("mommy.h5", H5Easy::File::Truncate);
-    file.createDataSet("mommy/Z", Z);
-    file.createDataSet("mommy/b", b);
+    H5Easy::File file("frico.h5", H5Easy::File::Truncate);
+    file.createDataSet("frico/Z", Z);
+    file.createDataSet("frico/b", b);
 
     std::cout << "Solving linear system...\n";
     const auto start{std::chrono::steady_clock::now()};
-    mommy::zdvector x = Z.lu().solve(b);
+    frico::zdvector x = Z.lu().solve(b);
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
     std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
 
 
-    file.createDataSet("mommy/x", x);
+    file.createDataSet("frico/x", x);
 
 
     std::vector<double> data( msh.triangles.size() );
     std::vector<double> datab( msh.triangles.size() );
 
-    mommy::zdfield tri_AJ = mommy::zdfield::Zero(msh.triangles.size(), 3);
-    mommy::zdvector tri_AdivJ = mommy::zdvector::Zero(msh.triangles.size());
-    mommy::zdfield tri_J = mommy::ddfield::Zero( msh.triangles.size(), 3 );
+    frico::zdfield tri_AJ = frico::zdfield::Zero(msh.triangles.size(), 3);
+    frico::zdvector tri_AdivJ = frico::zdvector::Zero(msh.triangles.size());
+    frico::zdfield tri_J = frico::ddfield::Zero( msh.triangles.size(), 3 );
 
     Eigen::Matrix<double, 3, 1> temp;
 
@@ -669,11 +669,11 @@ int main(int argc, char **argv)
         auto bar_Tminus = barycenter(msh, Tminus);
         auto bar_Tplus = barycenter(msh, Tplus);
 
-        auto A_Tminus = mommy::measure(msh, Tminus);
-        auto A_Tplus = mommy::measure(msh, Tplus);
+        auto A_Tminus = frico::measure(msh, Tminus);
+        auto A_Tplus = frico::measure(msh, Tplus);
 
-        mommy::ezvec3 Jminus = ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index);
-        mommy::ezvec3 Jplus = ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index);
+        frico::ezvec3 Jminus = ibf.eval_minus(bar_Tminus)*x(ibf.matrix_index);
+        frico::ezvec3 Jplus = ibf.eval_plus(bar_Tplus)*x(ibf.matrix_index);
 
         tri_AJ.row(ibf.itminus) += A_Tminus * Jminus;
         tri_AJ.row(ibf.itplus) += A_Tplus * Jplus;
@@ -685,11 +685,11 @@ int main(int argc, char **argv)
         tri_J.row(ibf.itplus) += Jplus;
     }
 
-    db.add_variable("mesh", "J", tri_J, mommy::var_centering::zonal);
+    db.add_variable("mesh", "J", tri_J, frico::var_centering::zonal);
 
-    mommy::zdfield Exy = mommy::zdfield::Zero(360, 3);
-    mommy::zdfield Eyz = mommy::zdfield::Zero(360, 3);
-    mommy::zdfield Exz = mommy::zdfield::Zero(360, 3);
+    frico::zdfield Exy = frico::zdfield::Zero(360, 3);
+    frico::zdfield Eyz = frico::zdfield::Zero(360, 3);
+    frico::zdfield Exz = frico::zdfield::Zero(360, 3);
     
 
     double freq = cfg.frequency;
@@ -706,12 +706,12 @@ int main(int argc, char **argv)
         for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
             const auto& tri = msh.triangles[itri];
             auto bar = barycenter(msh, tri);
-            mommy::ezvec3 J = tri_AJ.row(itri);
+            frico::ezvec3 J = tri_AJ.row(itri);
             std::complex<double> divJ = tri_AdivJ(itri);
 
             /* XY */ {
-                mommy::point Pxy{ R*std::cos(theta), R*std::sin(theta), 0.0 };
-                mommy::vec3 vR = Pxy - bar;
+                frico::point Pxy{ R*std::cos(theta), R*std::sin(theta), 0.0 };
+                frico::vec3 vR = Pxy - bar;
                 double R = norm(vR);
                 std::complex<double> jkR{0.0, k*R};
                 std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
@@ -719,8 +719,8 @@ int main(int argc, char **argv)
             }
 
             /* YZ */ {
-                mommy::point Pyz{ 0.0, R*std::cos(theta), R*std::sin(theta) };
-                mommy::vec3 vR = Pyz - bar;
+                frico::point Pyz{ 0.0, R*std::cos(theta), R*std::sin(theta) };
+                frico::vec3 vR = Pyz - bar;
                 double R = norm(vR);
                 std::complex<double> jkR{0.0, k*R};
                 std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
@@ -728,8 +728,8 @@ int main(int argc, char **argv)
             }
 
             /* XZ */ {
-                mommy::point Pxz{ R*std::cos(theta), 0.0, -R*std::sin(theta) };
-                mommy::vec3 vR = Pxz - bar;
+                frico::point Pxz{ R*std::cos(theta), 0.0, -R*std::sin(theta) };
+                frico::vec3 vR = Pxz - bar;
                 double R = norm(vR);
                 std::complex<double> jkR{0.0, k*R};
                 std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
@@ -762,23 +762,23 @@ int main(int argc, char **argv)
     }
 
     
-    mommy::mesh samplingsphere;
+    frico::mesh samplingsphere;
     //make_sampling_sphere(samplingsphere, {0,0,0}, 0.75, 0.05);
     make_sampling_rectangle(samplingsphere, {0,0,0}, 0.025);
     auto nspoints = samplingsphere.vertices.size();
     std::vector<double> sEmag( nspoints );
-    mommy::zdfield vEmag = mommy::zdfield::Zero( nspoints, 3 );
+    frico::zdfield vEmag = frico::zdfield::Zero( nspoints, 3 );
     std::cout << "postpro begin\n";
     for (size_t i = 0; i < nspoints; i++) {
         const auto& spt = samplingsphere.vertices[i]; 
-        mommy::ezvec3 locE = mommy::ezvec3::Zero();
+        frico::ezvec3 locE = frico::ezvec3::Zero();
         for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
             const auto& tri = msh.triangles[itri];
-            mommy::vec3 bar = mommy::barycenter(msh, tri);
+            frico::vec3 bar = frico::barycenter(msh, tri);
             double R = norm(spt - bar);
             std::complex<double> jkR{0, k*R};
             std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
-            mommy::ezvec3 J = tri_AJ.row(itri);
+            frico::ezvec3 J = tri_AJ.row(itri);
             std::complex<double> divJ = tri_AdivJ(itri);
             locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
         }
@@ -788,21 +788,21 @@ int main(int argc, char **argv)
     std::cout << "postpro end\n";
 
     db.add_mesh("sampling", samplingsphere);
-    db.add_variable("sampling", "magE", sEmag, mommy::var_centering::nodal);
-    db.add_variable("sampling", "E", vEmag, mommy::var_centering::nodal);
+    db.add_variable("sampling", "magE", sEmag, frico::var_centering::nodal);
+    db.add_variable("sampling", "E", vEmag, frico::var_centering::nodal);
     
     
     for (int i = 0; i < 100; i++) {
         std::string stepfname = "step_";
         stepfname = stepfname + std::to_string(i) + ".silo";
-        mommy::silo db2(stepfname);
+        frico::silo db2(stepfname);
 
         auto dT = i*(1./cfg.frequency)/100.0;
 
-        mommy::ddfield E = (vEmag*std::exp(jomega*dT)).real();
+        frico::ddfield E = (vEmag*std::exp(jomega*dT)).real();
 
         db2.add_mesh("sampling", samplingsphere);
-        db2.add_variable("sampling", "E", E, mommy::var_centering::nodal);
+        db2.add_variable("sampling", "E", E, frico::var_centering::nodal);
     }
     
 

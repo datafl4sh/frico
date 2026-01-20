@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -25,7 +25,7 @@
 #include <cmath>
 
 #include <Eigen/Dense>
-namespace mommy {
+namespace frico {
 
 class vec3
 {
@@ -136,4 +136,4 @@ operator<<(std::ostream& os, const vec3& p)
 
 using point = vec3;
 
-} // namespace mommy
+} // namespace frico

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(mommy)
+project(frico)
 
 set(CMAKE_CXX_STANDARD 23)
 
@@ -41,8 +41,8 @@ set(SOURCES main.cpp geom_mesh.cpp input_gmsh.cpp output_silo.cpp
     quadratures.cpp rwg_basis.cpp
 )
 
-add_executable(mommy ${SOURCES})
+add_executable(frico ${SOURCES})
 
-target_link_libraries(mommy PUBLIC
+target_link_libraries(frico PUBLIC
     ${LINK_LIBS}
 )

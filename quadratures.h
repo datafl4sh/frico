@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -25,7 +25,7 @@
 #include "geom_point.h"
 #include "geom_mesh.h"
 
-namespace mommy {
+namespace frico {
 
 struct quadrature_point {
     point   p;
@@ -41,4 +41,4 @@ integrate(const mesh&, const triangle&, size_t degree);
 std::vector<quadrature_point>
 integrate_subtri(const mesh&, const triangle&, size_t degree);
 
-} // namespace mommy
+} // namespace frico

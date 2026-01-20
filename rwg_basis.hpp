@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -30,7 +30,7 @@
 #include "geom_point.h"
 #include "eigen.hpp"
 
-namespace mommy {
+namespace frico {
 
 /* The convention used for the basis functions is the one of 
  * "MOM3D Method of Moments Code Theory Manual" by J. F. Shaeffer.
@@ -111,4 +111,4 @@ operator<<(std::ostream& os, const basis_function& bf)
 
 void make_function_space(const mesh&, std::vector<basis_function>&);
 
-} // mommy
+} // frico

@@ -1,5 +1,5 @@
 /*
- * MoMmy - My experimental Method of Moments code
+ * FRICO - Friendly Radiation Integral COde
  *
  * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
@@ -30,7 +30,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
-namespace mommy {
+namespace frico {
 
 using ddmatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 using zdmatrix = Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic>;
@@ -45,4 +45,4 @@ using zsparsematrix = Eigen::SparseMatrix<std::complex<double>>;
 using edvec3 = Eigen::Matrix<double, 3, 1>;
 using ezvec3 = Eigen::Matrix<std::complex<double>, 3, 1>;
 
-} // namespace mommy
+} // namespace frico
