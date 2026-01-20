@@ -1,7 +1,7 @@
 /*
  * FRICO - Friendly Radiation Integral COde
  *
- * Copyright (c) 2025, Matteo Cicuttin - IV3IWE
+ * Copyright (c) 2025-2026, Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
  * Dipartimento di Scienze Matematiche "G. L. Lagrange"
  *
@@ -21,11 +21,25 @@
 
 #pragma once
 
-#include "geom_mesh.h"
+#include <vector>
+#include <string>
+#include <expected>
 
 namespace frico {
 
-bool load_mesh_from_gmsh(mesh& msh);
-bool load_mesh_from_gmsh(const std::string&, mesh&);
+struct frequency_range {
+    double  start;
+    double  step;
+    double  end;
+};
+
+enum class parse_error {
+    invalid_input,
+    out_of_range,
+};
+
+std::vector<std::string> split(const std::string&, char);
+std::expected<frequency_range, parse_error>
+    parse_frequency_range(const std::string&);
 
 } // namespace frico

@@ -269,7 +269,7 @@ compute_connectivity(mesh& msh)
     }
 }
 
-void
+bool
 load_mesh_from_gmsh(mesh& msh)
 {
     std::vector<std::optional<size_t>> node_tag2ofs;
@@ -323,6 +323,32 @@ load_mesh_from_gmsh(mesh& msh)
     }
 
     compute_connectivity(msh);
+
+    return true;
+}
+
+bool
+load_mesh_from_gmsh(const std::string& filename, mesh& msh)
+{
+    try {
+        gmsh::initialize();
+        gmsh::option::setNumber("General.Verbosity", 1);
+        gmsh::open(filename);
+    }
+
+    catch (const std::runtime_error& e) {
+        std::cerr << "GMSH exception: " << e.what() << std::endl;
+        return 1;
+    }
+
+    gmsh::model::mesh::generate(2);
+    gmsh::model::mesh::setOrder(1);
+
+    load_mesh_from_gmsh(msh);
+    gmsh::clear();
+    gmsh::finalize();
+
+    return true;
 }
 
 } // namespace frico

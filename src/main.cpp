@@ -35,6 +35,7 @@
 #include "output_silo.h"
 #include "quadratures.h"
 #include "rwg_basis.h"
+#include "utils.h"
 
 #define MU0     1.256637061435917e-06
 #define EPS0    8.8541878188e-12
@@ -68,14 +69,16 @@ ddvector prjtest(const mesh& msh, const std::vector<basis_function>& bfs)
                 auto bi = *tbi[i];
                 auto gi = cmap[ bi.edge_index ];
                 const auto& ibf = bfs[ gi ];
-                edvec3 ibfval = (bi.sign > 0) ? ibf.eval_plus(qp.p) : ibf.eval_minus(qp.p);
+                edvec3 ibfval = (bi.sign > 0)?
+                    ibf.eval_plus(qp.p) : ibf.eval_minus(qp.p);
 
                 for (size_t j = 0; j < 3; j++) {
                     if (not tbi[j]) { continue; }
                     auto bj = *tbi[j];
                     auto gj = cmap[ bj.edge_index ];
                     const auto& jbf = bfs[ gj ];
-                    edvec3 jbfval = (bj.sign > 0) ? jbf.eval_plus(qp.p) : jbf.eval_minus(qp.p);
+                    edvec3 jbfval = (bj.sign > 0)?
+                        jbf.eval_plus(qp.p) : jbf.eval_minus(qp.p);
 
                     mass(gi,gj) += qp.w * jbfval.dot(ibfval);
                 }
@@ -115,8 +118,10 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
             const auto& jTminus = msh.triangles[jbf.itminus];
             const auto& jTplus = msh.triangles[jbf.itplus];
 
-            bool split_minus = (jbf.itminus == ibf.itminus) or (jbf.itminus == ibf.itplus);
-            bool split_plus = (jbf.itplus == ibf.itminus) or (jbf.itplus == ibf.itplus);
+            bool split_minus =
+                (jbf.itminus == ibf.itminus) or (jbf.itminus == ibf.itplus);
+            bool split_plus =
+                (jbf.itplus == ibf.itminus) or (jbf.itplus == ibf.itplus);
 
             auto jqps_minus = split_minus?
                 integrate_subtri(msh, jTminus, cfg.degree) :
@@ -317,45 +322,15 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
 } //namespace frico
 
 
-static std::vector<std::string>
-split(const std::string& str) {
-    std::vector<std::string> tokens;
-
-    size_t first = 0;
-    size_t last = 0;
-
-    while (first < str.length()) {
-
-        while ( (first < str.length()) and str[first] == ':' ) {
-            first++;
-        }
-
-        last = first; 
-        while ( (last < str.length()) and str[last] != ':' ) {
-            last++;
-        }
-
-        if (last > first) {
-            tokens.push_back( str.substr(first, last - first) );
-        }
-
-        first = last+1;
-    }
-
-    return tokens;
-}
 
 bool make_sampling_sphere(frico::mesh& msh, const frico::point& center, double r, double h)
 {
     gmsh::initialize();
+    gmsh::option::setNumber("General.Verbosity", 1);
 
     gmsh::model::add("sampling");
 
-    std::vector<std::pair<int,int>> objects;
-    objects.push_back(
-        std::pair(3, gmsh::model::occ::addSphere(
-            center.x(), center.y(), center.z(), r))
-    );
+    gmsh::model::occ::addSphere(center.x(), center.y(), center.z(), r);
 
     gmsh::model::occ::synchronize();
 
@@ -363,7 +338,7 @@ bool make_sampling_sphere(frico::mesh& msh, const frico::point& center, double r
     gmsh::model::getEntities(vp);
     gmsh::model::mesh::setSize(vp, h);
     gmsh::model::mesh::generate(2);
-    //gmsh::model::mesh::setOrder(1);
+    gmsh::model::mesh::setOrder(1);
 
     frico::load_mesh_from_gmsh(msh);
 
@@ -375,6 +350,7 @@ bool make_sampling_sphere(frico::mesh& msh, const frico::point& center, double r
 bool make_sampling_rectangle(frico::mesh& msh, const frico::point& center, double h)
 {
     gmsh::initialize();
+    gmsh::option::setNumber("General.Verbosity", 1);
 
     gmsh::model::add("sampling");
 
@@ -403,13 +379,12 @@ int main(int argc, char **argv)
 
     const char *gmsh_geo_path = nullptr;
     const char *silo_path = "test.silo";
+    const char *range_expr = nullptr;
     frico::config cfg;
-    cfg.frequency = 0;
+    cfg.frequency = -1;
     cfg.degree = 2;
     bool force_symmetry = false;
     bool approx_matrix = false;
-
-    std::string range_expr;
 
     int opt;
     while ((opt = getopt(argc, argv, "Af:g:k:s:SR:")) != -1) {
@@ -447,72 +422,25 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    try {
-        gmsh::initialize();
-        gmsh::open(gmsh_geo_path);
-    }
-
-    catch (const std::runtime_error& e) {
-        std::cerr << "GMSH exception: " << e.what() << std::endl;
-        return 1;
-    }
-
-    gmsh::model::mesh::generate(2);
-    gmsh::model::mesh::setOrder(1);
-
     frico::mesh msh;
-    frico::load_mesh_from_gmsh(msh);
-    gmsh::clear();
-    gmsh::finalize();
+    if ( not frico::load_mesh_from_gmsh(gmsh_geo_path, msh) ) {
+        std::cerr << "Can't load geometry, exiting" << std::endl;
+        return EXIT_FAILURE;
+    }
 
-    std::cout << msh.vertices.size() << " " << msh.triangles.size() << std::endl;
+    if ( (cfg.frequency <= 0) and (range_expr == nullptr) ) {
+        std::cerr << "Frequency not specified (-f or -R)" << std::endl;
+        return EXIT_FAILURE;
+    }
 
     frico::silo db(silo_path);
     db.add_mesh("mesh", msh);
 
-    #if 0
-    double l = 0.0;
-    for (auto& be : msh.boundary_edges) {
-        l += measure(msh, deref(msh.edges, be));
-    }
-    std::cout << l << std::endl;
-
-    double a = 0.0;
-    double ai = 0.0;
-    for (auto& t : msh.triangles) {
-        a += measure(msh, t);
-        auto qps = integrate(msh, t, 3);
-        for (auto& qp : qps) {
-            ai += qp.w;
-        }
-    }
-    std::cout << a << " " << ai << std::endl;
-
-    std::vector<double> test;
-    for (size_t i = 0; i < msh.triangles.size(); i++) {
-        test.push_back(i);
-    }
-
-    db.add_variable("mesh", "test", test, frico::var_centering::zonal);
-
-    frico::ddvector vals = frico::ddvector::Zero(msh.vertices.size());
-    for (size_t i = 0; i < msh.vertices.size(); i++) {
-        const auto& vtx = msh.vertices[i];
-        auto val = std::sin(M_PI*vtx.x())*std::sin(M_PI*vtx.y());
-        vals(i) = val;
-    }
-    db.add_variable("mesh", "vals", vals, frico::var_centering::nodal);
-    #endif
-    frico::ddfield norms = frico::ddfield::Zero(msh.triangles.size(), 3);
-    for (size_t i = 0; i < msh.triangles.size(); i++) {
-        norms.row(i) = normal(msh, msh.triangles[i]);
-    }
-    db.add_variable("mesh", "normals", norms, frico::var_centering::zonal);
-
-    std::cout << "Vertices: " << msh.vertices.size() << std::endl;
-    std::cout << "Edges:    " << msh.edges.size() << std::endl;
-    std::cout << "Cells:    " << msh.triangles.size() << std::endl;
-    std::cout << "IntEdges: " << frico::num_internal_edges(msh) << std::endl;
+    std::cout << "Mesh information: " << std::endl;
+    std::cout << "        Vertices: " << msh.vertices.size() << std::endl;
+    std::cout << "           Edges: " << msh.edges.size() << std::endl;
+    std::cout << "           Cells: " << msh.triangles.size() << std::endl;
+    std::cout << "  Internal edges: " << frico::num_internal_edges(msh) << "\n";
 
     std::vector<frico::basis_function> bfs;
     frico::make_function_space(msh, bfs);
@@ -560,15 +488,28 @@ int main(int argc, char **argv)
     #endif
 
 
-    if (range_expr != "") {
-        auto toks = split(range_expr);
-        double fstart = std::stod(toks[0]);
-        double step = std::stod(toks[1]);
-        double fend = std::stod(toks[2]);
+    if (range_expr) {
+        auto exp_range = frico::parse_frequency_range(range_expr);
+        if ( not exp_range.has_value() ) {
+            switch ( exp_range.error() ) {
+            case frico::parse_error::invalid_input:
+                std::cerr << "Malformed frequency range specification\n";
+                return EXIT_FAILURE;
+                break;
+            case frico::parse_error::out_of_range:
+                std::cerr << "Invalid range specification\n";
+                return EXIT_FAILURE;
+                break;
+            default:
+                std::unreachable();
+            }
+        }
+
+        auto range = *exp_range;
 
         std::ofstream ofs("zplot.txt");
 
-        for (double freq = fstart; freq <= fend; freq += step) {
+        for (double freq = range.start; freq <= range.end; freq += range.step) {
             cfg.frequency = freq;
             auto system_size = frico::num_internal_edges(msh);
             frico::zdmatrix Z = frico::zdmatrix::Zero(system_size, system_size);
