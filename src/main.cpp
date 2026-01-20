@@ -642,7 +642,7 @@ int main(int argc, char **argv)
 
     for (int deg = 0; deg < 360; deg++) {
         double theta = deg*M_PI/180;
-        double R = 2.0;
+        double R = 5.0;
         
         for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
             const auto& tri = msh.triangles[itri];
@@ -678,6 +678,39 @@ int main(int argc, char **argv)
             }
         }
     }
+
+    std::ofstream ofs_nec("neccomp.csv");
+    ofs_nec << "X;Y;Z;EXM;EXP;EYM;EYP;EZM;EZP" << std::endl;
+    double sx = -5.0;
+    double sz = -5.0;
+    double dx = 0.25;
+    double dz = 0.25;
+    for (int i = 0; i < 41; i++) {
+        for (int j = 0; j < 41; j++) {
+            double x = sx + j*dx;
+            double z = sz + i*dz;
+            frico::point pt{x, 0.0, z};
+
+            frico::ezvec3 locE = frico::ezvec3::Zero();
+            for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+                const auto& tri = msh.triangles[itri];
+                auto bar = barycenter(msh, tri);
+                frico::ezvec3 J = tri_AJ.row(itri);
+                std::complex<double> divJ = tri_AdivJ(itri);
+
+                frico::vec3 vR = pt - bar;
+                double R = norm(vR);
+                std::complex<double> jkR{0.0, k*R};
+                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+                locE += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
+            }
+            
+            ofs_nec << pt.x() << ";" << pt.y() << ";" << pt.z() << ";";
+            ofs_nec << std::abs(locE(0)) << ";" << std::arg(locE(0)) << ";";
+            ofs_nec << std::abs(locE(1)) << ";" << std::arg(locE(1)) << ";";
+            ofs_nec << std::abs(locE(2)) << ";" << std::arg(locE(2)) << "\n";
+        }
+    }
     
     double magExy_max = 0.0;
     double magEyz_max = 0.0;
@@ -702,7 +735,7 @@ int main(int argc, char **argv)
                  << std::endl;
     }
 
-    
+    #if 0
     frico::mesh samplingsphere;
     //make_sampling_sphere(samplingsphere, {0,0,0}, 0.75, 0.05);
     make_sampling_rectangle(samplingsphere, {0,0,0}, 0.025);
@@ -745,7 +778,7 @@ int main(int argc, char **argv)
         db2.add_mesh("sampling", samplingsphere);
         db2.add_variable("sampling", "E", E, frico::var_centering::nodal);
     }
-    
+    #endif
 
     std::complex<double> I = 0.0;
     for (const auto& ibf : bfs) {
