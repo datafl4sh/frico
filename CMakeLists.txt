@@ -37,8 +37,8 @@ endif()
 add_subdirectory(deps/HighFive)
 set(LINK_LIBS ${LINK_LIBS} HighFive)
 
-set(SOURCES main.cpp geom_mesh.cpp input_gmsh.cpp output_silo.cpp
-    quadratures.cpp rwg_basis.cpp
+set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
+            src/output_silo.cpp src/quadratures.cpp src/rwg_basis.cpp
 )
 
 add_executable(frico ${SOURCES})

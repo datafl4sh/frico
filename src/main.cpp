@@ -24,7 +24,7 @@
 #include <fstream>
 #include <chrono>
 
-#include "eigen.hpp"
+#include "eigen.h"
 
 #include <highfive/H5Easy.hpp>
 
@@ -34,7 +34,7 @@
 #include "input_gmsh.h"
 #include "output_silo.h"
 #include "quadratures.h"
-#include "rwg_basis.hpp"
+#include "rwg_basis.h"
 
 #define MU0     1.256637061435917e-06
 #define EPS0    8.8541878188e-12

@@ -28,7 +28,7 @@
 
 #include "geom_mesh.h"
 #include "geom_point.h"
-#include "eigen.hpp"
+#include "eigen.h"
 
 namespace frico {
 

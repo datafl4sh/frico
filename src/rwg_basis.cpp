@@ -20,7 +20,7 @@
  */
 
 
-#include "rwg_basis.hpp"
+#include "rwg_basis.h"
 
 namespace frico {
 
