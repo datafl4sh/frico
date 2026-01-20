@@ -12,4 +12,6 @@ FRICO was developed because of a lack of free and open-source 3D MoM solvers and
  * [Eigen](https://libeigen.gitlab.io/) for linear algebra
  * [HighFive](https://bluebrain.github.io/HighFive/) for HDF5 I/O
 
+---
 
+This software is proudly Friulian-made by IV3IWE, so that's the real reason of its name. For more Friulian-flavoured software you can also take a look to [MUSET](https://github.com/rvicedomini/muset).
