@@ -39,7 +39,11 @@ enum class parse_error {
 };
 
 std::vector<std::string> split(const std::string&, char);
+
 std::expected<frequency_range, parse_error>
     parse_frequency_range(const std::string&);
+
+std::expected<std::vector<int>, parse_error>
+    parse_integer_list(const std::string&);
 
 } // namespace frico

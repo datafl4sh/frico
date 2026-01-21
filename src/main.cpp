@@ -43,10 +43,13 @@ namespace frico {
 
 struct config
 {
-    double  frequency;
-    size_t  degree;
-    bool    approx_matrix;
-    bool    force_symmetry;
+    const char *    gmsh_geo_path = nullptr;
+    const char *    silo_path = "test.silo";
+    const char *    range_expr = nullptr;
+    double          frequency = -1;
+    size_t          degree = 1;
+    bool            approx_matrix = false;
+    bool            force_symmetry = false;
 };
 
 ddvector prjtest(const mesh& msh, const std::vector<basis_function>& bfs)
@@ -293,6 +296,7 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
         }
     
         auto itf_tag = ibf.interface.value();
+        if (itf_tag != 3) continue;
         std::cout << "rhs: itf tag " << itf_tag << " idx " << ibf.matrix_index << "\n";
 
         double val = 0.0;
@@ -342,7 +346,7 @@ bool make_sampling_sphere(frico::mesh& msh, const frico::point& center, double r
     gmsh::model::mesh::generate(2);
     gmsh::model::mesh::setOrder(1);
 
-    frico::load_mesh_from_gmsh(msh);
+    frico::load_from_gmsh(msh, frico::load_mode::quick);
 
     gmsh::clear();
     gmsh::finalize();
@@ -368,7 +372,7 @@ bool make_sampling_rectangle(frico::mesh& msh, const frico::point& center, doubl
     gmsh::model::mesh::generate(2);
     //gmsh::model::mesh::setOrder(1);
 
-    frico::load_mesh_from_gmsh(msh);
+    frico::load_from_gmsh(msh, frico::load_mode::quick);
 
     gmsh::clear();
     gmsh::finalize();
@@ -395,6 +399,7 @@ struct simulation {
     std::string                 name;       // Simulation name
     config                      cfg;        // Simulation config
     mesh                        msh;        // Mesh
+    std::vector<int>            skiptags;   // Surfaces to skip
     std::vector<basis_function> bfuncs;     // Basis functions
     std::vector<freq_context>   contexts;   // Data for each frequency
     excitation                  excit;
@@ -405,9 +410,22 @@ bool init_simulation(simulation& sim, const std::string& name,
 {
     sim.name = name;
 
-    if ( not frico::load_mesh_from_gmsh(geo_path, sim.msh) ) {
-        std::cerr << "Can't load geometry from " << geo_path << std::endl;
-        return false;
+    auto meshok = frico::load_from_gmsh(geo_path, sim.msh, sim.skiptags);
+    if ( not meshok ) {
+        auto err = meshok.error();
+        if (err.errtype == frico::meshing_error::gmsh_issue) {
+            std::cerr << "Can't load geometry, exiting" << std::endl;
+            return EXIT_FAILURE;
+        }
+        if (err.errtype == frico::meshing_error::bad_connectivity) {
+            std::cerr <<
+                "The mesh connectivity is not valid because an edge shared by\n"
+                "more than two triangles was detected. This does not permit\n"
+                "to construct the RWG basis.\n"
+                "The tags of the involved surfaces are " << err.tminus_tag
+                << ", " << err.tplus_tag << " and " << err.offending_tag << ".\n";
+            return EXIT_FAILURE;
+        }
     }
 
     std::cout << "Mesh information: " << std::endl;
@@ -487,38 +505,41 @@ int main(int argc, char **argv)
 {
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
-    const char *gmsh_geo_path = nullptr;
-    const char *silo_path = "test.silo";
-    const char *range_expr = nullptr;
+    std::cout <<
+        "FRICO v0.0 3D MoM solver - Matteo Cicuttin [IV3IWE] (C) 2025-2026\n\n";
+    
     frico::config cfg;
     cfg.frequency = -1;
     cfg.degree = 2;
-    bool force_symmetry = false;
-    bool approx_matrix = false;
+
+    const char *arg_skiptags = nullptr;
 
     int opt;
-    while ((opt = getopt(argc, argv, "Af:g:k:s:SR:")) != -1) {
+    while ((opt = getopt(argc, argv, "Af:g:k:s:SR:x:")) != -1) {
         switch (opt) {
         case 'A':
-            approx_matrix = true;
+            cfg.approx_matrix = true;
             break;
         case 'f':
             cfg.frequency = std::stod(optarg);
             break;
         case 'g':
-            gmsh_geo_path = optarg;
+            cfg.gmsh_geo_path = optarg;
             break;
         case 'k':
             cfg.degree = std::stoull(optarg);
             break;
         case 's':
-            silo_path = optarg;
+            cfg.silo_path = optarg;
             break;
         case 'S':
-            force_symmetry = true;
+            cfg.force_symmetry = true;
             break;
         case 'R':
-            range_expr = optarg;
+            cfg.range_expr = optarg;
+            break;
+        case 'x':
+            arg_skiptags = optarg;
             break;
 
         default:
@@ -528,22 +549,45 @@ int main(int argc, char **argv)
     }
 
     /* (1) Check if geometry was specified */
-    if (gmsh_geo_path == nullptr) {
+    if (cfg.gmsh_geo_path == nullptr) {
         std::cerr << "No geometry specified (-g)\n";
         return EXIT_FAILURE;
     }
 
     /* (2) Check if frequency was specified, either single or sweep */
-    if ( (cfg.frequency <= 0) and (range_expr == nullptr) ) {
+    if ( (cfg.frequency <= 0) and (cfg.range_expr == nullptr) ) {
         std::cerr << "Simulation frequency not specified (-f or -R)" << std::endl;
         return EXIT_FAILURE;
     }
 
+    std::vector<int> skiptags;
+    if (arg_skiptags) {
+        auto exp_skiptags = frico::parse_integer_list(arg_skiptags);
+        if (not exp_skiptags) {
+            std::cerr << "Error parsing argument of -x option" << std::endl;
+            return EXIT_FAILURE;
+        }
+        skiptags = *exp_skiptags;
+    }
+
     /* Generate & load mesh */
     frico::mesh msh;
-    if ( not frico::load_mesh_from_gmsh(gmsh_geo_path, msh) ) {
-        std::cerr << "Can't load geometry, exiting" << std::endl;
-        return EXIT_FAILURE;
+    auto meshok = frico::load_from_gmsh(cfg.gmsh_geo_path, msh, skiptags);
+    if ( not meshok ) {
+        auto err = meshok.error();
+        if (err.errtype == frico::meshing_error::gmsh_issue) {
+            std::cerr << "Can't load geometry, exiting" << std::endl;
+            return EXIT_FAILURE;
+        }
+        if (err.errtype == frico::meshing_error::bad_connectivity) {
+            std::cerr <<
+                "The mesh connectivity is not valid because an edge shared by\n"
+                "more than two triangles was detected. This does not permit\n"
+                "to construct the RWG basis.\n"
+                "The tags of the involved surfaces are " << err.tminus_tag
+                << ", " << err.tplus_tag << " and " << err.offending_tag << ".\n";
+            return EXIT_FAILURE;
+        }
     }
 
     std::cout << "Mesh information: " << std::endl;
@@ -552,7 +596,7 @@ int main(int argc, char **argv)
     std::cout << "           Cells: " << msh.triangles.size() << std::endl;
     std::cout << "  Internal edges: " << frico::num_internal_edges(msh) << "\n";
 
-    frico::silo db(silo_path);
+    frico::silo db(cfg.silo_path);
     db.add_mesh("mesh", msh);
 
     std::vector<frico::basis_function> bfs;
@@ -601,8 +645,8 @@ int main(int argc, char **argv)
     #endif
 
 
-    if (range_expr) {
-        auto exp_range = frico::parse_frequency_range(range_expr);
+    if (cfg.range_expr) {
+        auto exp_range = frico::parse_frequency_range(cfg.range_expr);
         if ( not exp_range.has_value() ) {
             switch ( exp_range.error() ) {
             case frico::parse_error::invalid_input:
@@ -631,7 +675,7 @@ int main(int argc, char **argv)
 
             std::cout << "Assemblying linear system...\n";
             const auto asm_start{std::chrono::steady_clock::now()};
-            if (approx_matrix) {
+            if (cfg.approx_matrix) {
                 frico::compute_matrix_approx(msh, bfs, Z, cfg);
             } else {
                 frico::compute_matrix(msh, bfs, Z, cfg);
@@ -640,7 +684,7 @@ int main(int argc, char **argv)
             const auto asm_end{std::chrono::steady_clock::now()};
             const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
             std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
-            if (force_symmetry) {
+            if (cfg.force_symmetry) {
                 Z = (Z+Z.transpose())/2.0;
             }
 
@@ -657,7 +701,8 @@ int main(int argc, char **argv)
                     continue;
                 }
         
-                I += ibf.length*x(ibf.matrix_index);
+                if (ibf.interface.value() == 3)
+                    I += ibf.length*x(ibf.matrix_index);
             }
             auto z = 1./I;
 
@@ -679,7 +724,7 @@ int main(int argc, char **argv)
 
     std::cout << "Assemblying linear system...\n";
     const auto asm_start{std::chrono::steady_clock::now()};
-    if (approx_matrix) {
+    if (cfg.approx_matrix) {
         frico::compute_matrix_approx(msh, bfs, Z, cfg);
     } else {
         frico::compute_matrix(msh, bfs, Z, cfg);
@@ -688,7 +733,7 @@ int main(int argc, char **argv)
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
     std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
-    if (force_symmetry) {
+    if (cfg.force_symmetry) {
         Z = (Z+Z.transpose())/2.0;
     }
   

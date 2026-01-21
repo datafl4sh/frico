@@ -80,4 +80,24 @@ parse_frequency_range(const std::string& str)
     return ret;
 }
 
+std::expected<std::vector<int>, parse_error>
+parse_integer_list(const std::string& str)
+{
+    auto tokens = split(str, ',');
+
+    std::vector<int> ret;
+    ret.reserve( tokens.size() );
+
+    for (auto& tok : tokens) {
+        try {
+            ret.push_back( std::stoi(tok) );
+        }
+        catch (...) {
+            return std::unexpected(parse_error::invalid_input);
+        }
+    }
+
+    return ret;
+}
+
 } // namespace frico

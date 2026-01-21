@@ -21,11 +21,39 @@
 
 #pragma once
 
+#include <expected>
 #include "geom_mesh.h"
 
 namespace frico {
 
-bool load_mesh_from_gmsh(mesh& msh);
-bool load_mesh_from_gmsh(const std::string&, mesh&);
+enum class meshing_error {
+    gmsh_issue,
+    bad_connectivity,
+};
+struct meshing_error_info
+{
+    meshing_error   errtype;
+
+    /* for bad_connectivity */
+    int             tminus_tag;
+    int             tplus_tag;
+    int             offending_tag;
+};
+
+using merr_t = std::expected<bool, meshing_error_info>;
+
+enum class load_mode {
+    full,
+    quick
+};
+
+/* Perhaps this went a bit too far... */
+merr_t load_from_gmsh(mesh&);
+merr_t load_from_gmsh(mesh&, const load_mode);
+merr_t load_from_gmsh(mesh&, const load_mode, std::vector<int>&);
+merr_t load_from_gmsh(const std::string&, mesh&);
+merr_t load_from_gmsh(const std::string&, mesh&, const load_mode);
+merr_t load_from_gmsh(const std::string&, mesh&, const std::vector<int>&);
+merr_t load_from_gmsh(const std::string&, mesh&, const load_mode, const std::vector<int>&);
 
 } // namespace frico
