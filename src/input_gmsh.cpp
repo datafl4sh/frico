@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <optional>
 #include <cassert>
+#include <expected>
 
 #include "geom_mesh.h"
 #include "gmsh.h"
@@ -168,9 +169,14 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
     }
 }
 
+struct conn_error_info
+{
+    int     tminus_tag;
+    int     tplus_tag;
+    int     offending_tag;
+};
 
-
-static void
+static std::expected<bool, conn_error_info>
 compute_connectivity(mesh& msh)
 {
     std::vector<int> flags(msh.edges.size(), 0);
@@ -188,7 +194,13 @@ compute_connectivity(mesh& msh)
         for (int iedg = 0; iedg < 3; iedg++) {
             auto ofs = ofss[iedg];
             auto& en = msh.edge_neighbours[ofs];
-            assert(not en.itplus);
+            if (en.itplus) {
+                conn_error_info cei;
+                cei.tminus_tag = msh.triangles[en.itminus].tag;
+                cei.tplus_tag = msh.triangles[*en.itplus].tag;
+                cei.offending_tag = msh.triangles[itri].tag;
+                return std::unexpected(cei);
+            }
             assert(not en.loc_eplus);
             if (flags[ofs]) {
                 if ( en.itminus < itri) {
@@ -267,6 +279,8 @@ compute_connectivity(mesh& msh)
 
         msh.tbis.push_back(tbi);
     }
+
+    return true;
 }
 
 bool
@@ -322,7 +336,18 @@ load_mesh_from_gmsh(mesh& msh)
         e.iv1 = *used[e.iv1];
     }
 
-    compute_connectivity(msh);
+    auto ccret = compute_connectivity(msh);
+    /* This must be moved out */
+    if (not ccret.has_value()) {
+        auto err = ccret.error();
+        std::cerr <<
+            "The mesh connectivity is not valid because an edge shared by\n"
+            "more than two triangles was detected. This does not permit\n"
+            "to construct the RWG basis.\n"
+            "The tags of the involved surfaces are " << err.tminus_tag << ", "
+            << err.tplus_tag << " and " << err.offending_tag << ".\n";
+            return false;
+    }
 
     return true;
 }
@@ -344,11 +369,11 @@ load_mesh_from_gmsh(const std::string& filename, mesh& msh)
     gmsh::model::mesh::generate(2);
     gmsh::model::mesh::setOrder(1);
 
-    load_mesh_from_gmsh(msh);
+    bool ret = load_mesh_from_gmsh(msh);
     gmsh::clear();
     gmsh::finalize();
 
-    return true;
+    return ret;
 }
 
 } // namespace frico

@@ -45,6 +45,8 @@ struct config
 {
     double  frequency;
     size_t  degree;
+    bool    approx_matrix;
+    bool    force_symmetry;
 };
 
 ddvector prjtest(const mesh& msh, const std::vector<basis_function>& bfs)
@@ -373,6 +375,114 @@ bool make_sampling_rectangle(frico::mesh& msh, const frico::point& center, doubl
     return true;
 }
 
+namespace frico {
+struct freq_context {
+    size_t                      ctx_number; // Incremental context number
+    double                      frequency;  // Frequency
+    zdmatrix                    Z;          // Impedance matrix
+    zdvector                    V;          // Voltage vector (rhs)
+    zdvector                    I;          // Current vector (unknown)
+    zdfield                     tri_J;      // Tri-by-tri current density
+    zdfield                     tri_AJ;     
+    zdvector                    tri_AdivJ;
+};
+
+struct excitation {
+
+};
+
+struct simulation {
+    std::string                 name;       // Simulation name
+    config                      cfg;        // Simulation config
+    mesh                        msh;        // Mesh
+    std::vector<basis_function> bfuncs;     // Basis functions
+    std::vector<freq_context>   contexts;   // Data for each frequency
+    excitation                  excit;
+};
+
+bool init_simulation(simulation& sim, const std::string& name,
+    const std::string& geo_path)
+{
+    sim.name = name;
+
+    if ( not frico::load_mesh_from_gmsh(geo_path, sim.msh) ) {
+        std::cerr << "Can't load geometry from " << geo_path << std::endl;
+        return false;
+    }
+
+    std::cout << "Mesh information: " << std::endl;
+    std::cout << "        Vertices: " << sim.msh.vertices.size() << std::endl;
+    std::cout << "           Edges: " << sim.msh.edges.size() << std::endl;
+    std::cout << "           Cells: " << sim.msh.triangles.size() << std::endl;
+    std::cout << "  Internal edges: " << num_internal_edges(sim.msh) << "\n";
+
+    make_function_space(sim.msh, sim.bfuncs);
+
+    return true;
+}
+
+bool init_sweep(simulation& sim, const frequency_range& freqs)
+{
+    size_t ctx_number = 0;
+    for (double freq = freqs.start; freq <= freqs.end; freq += freqs.step) {
+        freq_context context;
+        context.ctx_number = ctx_number++;
+        context.frequency = freq;
+        sim.contexts.push_back(context);
+    }
+
+    return true;
+}
+
+bool run_context(simulation& sim, size_t ctx_number)
+{
+    freq_context& context = sim.contexts[ctx_number];
+
+    auto system_size = num_internal_edges(sim.msh);
+    context.Z = zdmatrix::Zero(system_size, system_size);
+    context.V = zdvector::Zero(system_size);
+
+    std::cout << "Assemblying linear system...\n";
+    const auto asm_start{std::chrono::steady_clock::now()};
+    if (sim.cfg.approx_matrix) {
+        compute_matrix_approx(sim.msh, sim.bfuncs, context.Z, sim.cfg);
+    } else {
+        compute_matrix(sim.msh, sim.bfuncs, context.Z, sim.cfg);
+    }
+    
+    compute_rhs(sim.msh, sim.bfuncs, context.V, sim.cfg);
+    
+    const auto asm_end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
+    std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
+    if (sim.cfg.force_symmetry) {
+        context.Z = (context.Z+context.Z.transpose())/2.0;
+    }
+
+    std::cout << "Solving linear system...\n";
+    const auto start{std::chrono::steady_clock::now()};
+    context.I = context.Z.lu().solve(context.V);
+    const auto end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> elapsed_seconds{end - start};
+    std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
+
+    return true;
+}
+
+bool run_sweep(simulation& sim)
+{
+    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
+        run_context(sim, ctx_num);
+        /* call postpro */
+
+        /* dealloc matrix when we're done */
+        sim.contexts[ctx_num].Z.resize(0,0);
+    }
+    return true;
+}
+
+} // namespace frico
+
 int main(int argc, char **argv)
 {
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
@@ -504,7 +614,8 @@ int main(int argc, char **argv)
                 return EXIT_FAILURE;
                 break;
             default:
-                std::unreachable();
+                std::cerr << "Unreachable branch taken" << std::endl;
+                std::terminate();
             }
         }
 
@@ -594,10 +705,6 @@ int main(int argc, char **argv)
 
 
     file.createDataSet("frico/x", x);
-
-
-    std::vector<double> data( msh.triangles.size() );
-    std::vector<double> datab( msh.triangles.size() );
 
     frico::zdfield tri_AJ = frico::zdfield::Zero(msh.triangles.size(), 3);
     frico::zdvector tri_AdivJ = frico::zdvector::Zero(msh.triangles.size());

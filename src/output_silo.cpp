@@ -167,8 +167,8 @@ silo::add_variable(const std::string& mesh_name,
         } break;
 
         default:
-            std::unreachable();
-            return false;
+            std::cerr << "Unreachable branch taken" << std::endl;
+            std::terminate();
     }
 
     return true;
@@ -202,8 +202,8 @@ silo::add_variable(const std::string& mesh_name,
         } break;
 
         default:
-            std::unreachable();
-            return false;
+            std::cerr << "Unreachable branch taken" << std::endl;
+            std::terminate();
     }
 
     return true;
