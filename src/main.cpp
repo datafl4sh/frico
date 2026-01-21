@@ -417,30 +417,33 @@ int main(int argc, char **argv)
         }
     }
 
+    /* (1) Check if geometry was specified */
     if (gmsh_geo_path == nullptr) {
         std::cerr << "No geometry specified (-g)\n";
         return EXIT_FAILURE;
     }
 
+    /* (2) Check if frequency was specified, either single or sweep */
+    if ( (cfg.frequency <= 0) and (range_expr == nullptr) ) {
+        std::cerr << "Simulation frequency not specified (-f or -R)" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    /* Generate & load mesh */
     frico::mesh msh;
     if ( not frico::load_mesh_from_gmsh(gmsh_geo_path, msh) ) {
         std::cerr << "Can't load geometry, exiting" << std::endl;
         return EXIT_FAILURE;
     }
 
-    if ( (cfg.frequency <= 0) and (range_expr == nullptr) ) {
-        std::cerr << "Frequency not specified (-f or -R)" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    frico::silo db(silo_path);
-    db.add_mesh("mesh", msh);
-
     std::cout << "Mesh information: " << std::endl;
     std::cout << "        Vertices: " << msh.vertices.size() << std::endl;
     std::cout << "           Edges: " << msh.edges.size() << std::endl;
     std::cout << "           Cells: " << msh.triangles.size() << std::endl;
     std::cout << "  Internal edges: " << frico::num_internal_edges(msh) << "\n";
+
+    frico::silo db(silo_path);
+    db.add_mesh("mesh", msh);
 
     std::vector<frico::basis_function> bfs;
     frico::make_function_space(msh, bfs);

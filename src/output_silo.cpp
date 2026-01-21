@@ -21,6 +21,7 @@
 
 #include <complex>
 #include <cassert>
+#include <utility>
 #include "output_silo.h"
 
 namespace frico {
@@ -52,7 +53,11 @@ silo::open(const std::string& filename)
 bool
 silo::open(const char *filename)
 {
+#ifdef SILO_USE_HDF5
+    db_ = DBCreate(filename, DB_CLOBBER, DB_LOCAL, NULL, DB_HDF5);
+#else
     db_ = DBCreate(filename, DB_CLOBBER, DB_LOCAL, NULL, DB_PDB);
+#endif
     if (db_ == nullptr) {
         std::cerr << "SILO: Can't open " << filename << "\n";
         return false;
@@ -80,6 +85,10 @@ silo::close()
 bool
 silo::add_mesh(const std::string& name, const mesh& msh)
 {
+    if (not db_) {
+        return false;
+    }
+
     std::vector<double> x_coords, y_coords, z_coords;
     x_coords.reserve(msh.vertices.size());
     y_coords.reserve(msh.vertices.size());
@@ -119,13 +128,11 @@ silo::add_mesh(const std::string& name, const mesh& msh)
     if ( DBPutZonelist2(db_, zlname.c_str(), nzones, ndims,
         nodelist.data(), lnodelist, 1, 0, 0, shapetype, shapesize,
         shapecounts, nshapetypes, NULL) < 0 ) {
-        std::cerr << "DBPutZoneList2() failed\n";
         return false;
     }
 
     if ( DBPutUcdmesh(db_, name.c_str(), ndims, NULL, coords, nnodes,
             nzones, zlname.c_str(), NULL, DB_DOUBLE, NULL) < 0 ) {
-        std::cerr << "DBPutUcdmesh() failed\n";
         return false;
     }
 
@@ -139,24 +146,32 @@ silo::add_variable(const std::string& mesh_name,
     var_centering centering)
 {
     if (not db_) {
-        std::cerr << "add_variable(): Database not opened.\n";
         return false;
     }
 
-    if (centering == var_centering::zonal) {
-        DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
-           var.data(), var.size(), NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL);
-        return true;
+    switch (centering) {
+        case var_centering::zonal: {
+            if ( DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
+                 var.data(), var.size(), NULL, 0, DB_DOUBLE,
+                 DB_ZONECENT, NULL) < 0 ) {
+                return false;
+            }
+        } break;
+
+        case var_centering::nodal: {
+            if ( DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
+                 var.data(), var.size(), NULL, 0, DB_DOUBLE,
+                 DB_NODECENT, NULL) < 0 ) {
+                    return false;
+            }
+        } break;
+
+        default:
+            std::unreachable();
+            return false;
     }
 
-    if (centering == var_centering::nodal) {
-        DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
-           var.data(), var.size(), NULL, 0, DB_DOUBLE, DB_NODECENT, NULL);
-        return true;
-    }
-
-    assert(false && "Shouldn't have arrived here: invalid var centering");
-    return false;
+    return true;
 }
 
 bool
@@ -166,24 +181,32 @@ silo::add_variable(const std::string& mesh_name,
     var_centering centering)
 {
     if (not db_) {
-        std::cerr << "add_variable(): Database not opened.\n";
         return false;
     }
 
-    if (centering == var_centering::zonal) {
-        DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
-           var.data(), var.size(), NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL);
-        return true;
+    switch (centering) {
+        case var_centering::zonal: {
+            if ( DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
+                 var.data(), var.size(), NULL, 0, DB_DOUBLE,
+                 DB_ZONECENT, NULL) < 0 ) {
+                return false;
+            }
+        } break;
+
+        case var_centering::nodal: {
+            if ( DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
+                 var.data(), var.size(), NULL, 0, DB_DOUBLE,
+                 DB_NODECENT, NULL) < 0 ) {
+                    return false;
+            }
+        } break;
+
+        default:
+            std::unreachable();
+            return false;
     }
 
-    if (centering == var_centering::nodal) {
-        DBPutUcdvar1(db_, var_name.c_str(), mesh_name.c_str(),
-           var.data(), var.size(), NULL, 0, DB_DOUBLE, DB_NODECENT, NULL);
-        return true;
-    }
-
-    assert(false && "Shouldn't have arrived here: invalid var centering");
-    return false;
+    return true;
 }
 
 bool
@@ -219,7 +242,9 @@ silo::add_variable(const std::string& mesh_name,
     const char *defs[] = { def.c_str() };
     int types[] = { DB_VARTYPE_VECTOR };
     std::string defname = var_name + "defs";
-    DBPutDefvars(db_, defname.c_str(), 1, names, types, defs, NULL);
+    if ( DBPutDefvars(db_, defname.c_str(), 1, names, types, defs, NULL) < 0) {
+        return false;
+    }
 
     return true;
 }
@@ -233,12 +258,16 @@ silo::add_variable(const std::string& mesh_name,
     /* Real part */
     Eigen::Matrix<double, Eigen::Dynamic, 3> real = var.real();
     std::string vname_re = var_name + "_real";
-    add_variable(mesh_name, vname_re, real, centering);
+    if (not add_variable(mesh_name, vname_re, real, centering)) {
+        return false;
+    }
     
     /* Imaginary part */
     Eigen::Matrix<double, Eigen::Dynamic, 3> imag = var.imag();
     std::string vname_im = var_name + "_imag";
-    add_variable(mesh_name, vname_im, imag, centering);
+    if (not add_variable(mesh_name, vname_im, imag, centering)) {
+        return false;
+    }
     
     /* Magnitude */
     Eigen::Matrix<double, Eigen::Dynamic, 1> abs =
@@ -248,7 +277,10 @@ silo::add_variable(const std::string& mesh_name,
         abs(i) = std::sqrt( r.dot(r).real() );
     }
     std::string vname_mag = var_name + "_mag";
-    add_variable(mesh_name, vname_mag, abs, centering);
+    if (not add_variable(mesh_name, vname_mag, abs, centering)) {
+        return false;
+    }
+
     return true;
 }
 
