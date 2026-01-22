@@ -296,7 +296,7 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
         }
     
         auto itf_tag = ibf.interface.value();
-        if (itf_tag != 3) continue;
+        //if (itf_tag != 3) continue;
         std::cout << "rhs: itf tag " << itf_tag << " idx " << ibf.matrix_index << "\n";
 
         double val = 0.0;
@@ -701,8 +701,8 @@ int main(int argc, char **argv)
                     continue;
                 }
         
-                if (ibf.interface.value() == 3)
-                    I += ibf.length*x(ibf.matrix_index);
+                //if (ibf.interface.value() == 3)
+                //    I += ibf.length*x(ibf.matrix_index);
             }
             auto z = 1./I;
 
