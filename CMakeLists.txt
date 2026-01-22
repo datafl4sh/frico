@@ -8,7 +8,7 @@ set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-#set (CMAKE_CXX_FLAGS "-g -fsanitize=address")
+set (CMAKE_CXX_FLAGS "-g -fsanitize=address")
 #set (CMAKE_CXX_FLAGS "-g")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -86,7 +86,7 @@ endif()
 
 set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
             src/output_silo.cpp src/quadratures.cpp src/rwg_basis.cpp
-            src/utils.cpp
+            src/utils.cpp src/sources.cpp
 )
 
 add_executable(frico ${SOURCES})

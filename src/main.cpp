@@ -36,16 +36,15 @@
 #include "quadratures.h"
 #include "rwg_basis.h"
 #include "utils.h"
+#include "sources.h"
+#include "constants.h"
 
-#define MU0     1.256637061435917e-06
-#define EPS0    8.8541878188e-12
 namespace frico {
 
 struct config
 {
     const char *    gmsh_geo_path = nullptr;
     const char *    silo_path = "test.silo";
-    const char *    range_expr = nullptr;
     double          frequency = -1;
     size_t          degree = 1;
     bool            approx_matrix = false;
@@ -297,7 +296,7 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
     
         auto itf_tag = ibf.interface.value();
         //if (itf_tag != 3) continue;
-        std::cout << "rhs: itf tag " << itf_tag << " idx " << ibf.matrix_index << "\n";
+        //std::cout << "rhs: itf tag " << itf_tag << " idx " << ibf.matrix_index << "\n";
 
         double val = 0.0;
 
@@ -317,7 +316,7 @@ compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
         auto e = msh.edges[ibf.edge_index];
         auto bar = barycenter(msh, e);
 
-        std::cout << val << " " << ibf.rho_plus(bar) << std::endl;
+        //std::cout << val << " " << ibf.rho_plus(bar) << std::endl;
 
         std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
 
@@ -391,9 +390,6 @@ struct freq_context {
     zdvector                    tri_AdivJ;
 };
 
-struct excitation {
-
-};
 
 struct simulation {
     std::string                 name;       // Simulation name
@@ -402,7 +398,7 @@ struct simulation {
     std::vector<int>            skiptags;   // Surfaces to skip
     std::vector<basis_function> bfuncs;     // Basis functions
     std::vector<freq_context>   contexts;   // Data for each frequency
-    excitation                  excit;
+    std::unique_ptr<excitation> excit;
 };
 
 bool init_simulation(simulation& sim, const std::string& name,
@@ -415,7 +411,7 @@ bool init_simulation(simulation& sim, const std::string& name,
         auto err = meshok.error();
         if (err.errtype == frico::meshing_error::gmsh_issue) {
             std::cerr << "Can't load geometry, exiting" << std::endl;
-            return EXIT_FAILURE;
+            return false;
         }
         if (err.errtype == frico::meshing_error::bad_connectivity) {
             std::cerr <<
@@ -424,7 +420,7 @@ bool init_simulation(simulation& sim, const std::string& name,
                 "to construct the RWG basis.\n"
                 "The tags of the involved surfaces are " << err.tminus_tag
                 << ", " << err.tplus_tag << " and " << err.offending_tag << ".\n";
-            return EXIT_FAILURE;
+            return false;
         }
     }
 
@@ -456,11 +452,14 @@ bool run_context(simulation& sim, size_t ctx_number)
 {
     freq_context& context = sim.contexts[ctx_number];
 
+    std::cout << "Sweep frequency " << ctx_number << ": ";
+    std::cout << context.frequency << " Hz" << std::endl; 
+
     auto system_size = num_internal_edges(sim.msh);
     context.Z = zdmatrix::Zero(system_size, system_size);
     context.V = zdvector::Zero(system_size);
 
-    std::cout << "Assemblying linear system...\n";
+    std::cout << "  Assemblying linear system...\n";
     const auto asm_start{std::chrono::steady_clock::now()};
     if (sim.cfg.approx_matrix) {
         compute_matrix_approx(sim.msh, sim.bfuncs, context.Z, sim.cfg);
@@ -472,19 +471,53 @@ bool run_context(simulation& sim, size_t ctx_number)
     
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
-    std::cout << "ASM time: " << asm_elapsed_seconds << " seconds\n";
+    std::cout << "  ASM time: " << asm_elapsed_seconds << " seconds\n";
     if (sim.cfg.force_symmetry) {
         context.Z = (context.Z+context.Z.transpose())/2.0;
     }
 
-    std::cout << "Solving linear system...\n";
+    std::cout << "  Solving linear system...\n";
     const auto start{std::chrono::steady_clock::now()};
     context.I = context.Z.lu().solve(context.V);
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
-    std::cout << "Solve time: " << elapsed_seconds << " seconds\n";
+    std::cout << "  Solve time: " << elapsed_seconds << " seconds\n";
+
+    context.tri_AJ = zdfield::Zero(sim.msh.triangles.size(), 3);
+    context.tri_AdivJ = zdvector::Zero(sim.msh.triangles.size());
+    context.tri_J = zdfield::Zero(sim.msh.triangles.size(), 3);
+
+    for (const auto& bf : sim.bfuncs) {
+        const auto& Tminus = sim.msh.triangles[bf.itminus];
+        const auto& Tplus = sim.msh.triangles[bf.itplus];
+
+        auto bar_Tminus = barycenter(sim.msh, Tminus);
+        auto bar_Tplus = barycenter(sim.msh, Tplus);
+
+        auto A_Tminus = measure(sim.msh, Tminus);
+        auto A_Tplus = measure(sim.msh, Tplus);
+
+        std::complex<double> Iedge = context.I(bf.matrix_index);
+
+        ezvec3 Jminus = bf.eval_minus(bar_Tminus) * Iedge;
+        ezvec3 Jplus = bf.eval_plus(bar_Tplus) * Iedge;
+
+        context.tri_AJ.row(bf.itminus) += A_Tminus * Jminus;
+        context.tri_AJ.row(bf.itplus) += A_Tplus * Jplus;
+
+        context.tri_AdivJ(bf.itminus) += A_Tminus * bf.div_minus(bar_Tminus) * Iedge;
+        context.tri_AdivJ(bf.itplus) += A_Tplus * bf.div_plus(bar_Tplus) * Iedge;
+
+        context.tri_J.row(bf.itminus) += Jminus;
+        context.tri_J.row(bf.itplus) += Jplus;
+    }
 
     return true;
+}
+
+bool postpro_context(simulation& sim, size_t ctx_number)
+{
+    return false;
 }
 
 bool run_sweep(simulation& sim)
@@ -501,6 +534,145 @@ bool run_sweep(simulation& sim)
 
 } // namespace frico
 
+
+std::optional<frico::frequency_range>
+parse_frequency_parameters(const char *arg_frequency, const char *arg_range_expr)
+{
+    if ( (arg_frequency == nullptr) and (arg_range_expr == nullptr) ) {
+        std::cerr << "Simulation frequency not specified (-f or -R)\n";
+        return {};
+    }
+
+    if ( (arg_frequency != nullptr) and (arg_range_expr != nullptr) ) {
+        std::cerr << "Flags -f and -R are mutually exclusive\n";
+        return {};
+    }
+
+    std::cout << arg_frequency << " " << arg_range_expr << "\n";
+
+    if ( arg_frequency ) {
+        try {
+            double frequency = std::stod(arg_frequency);
+            return frico::frequency_range {
+                .start = frequency,
+                .step = frequency,
+                .end = frequency
+            };
+        }
+        catch (...) {
+            std::cerr << "Error parsing the parameter of -f\n";
+            return {};
+        }
+    }
+
+    if ( arg_range_expr ) {
+        auto exp_range = frico::parse_frequency_range(arg_range_expr);
+        if ( exp_range.has_value() ) {
+            std::cout << exp_range->start << " " << exp_range->step;
+            std::cout << " " << exp_range->end << "\n";
+            return exp_range.value();
+        } else {
+            switch ( exp_range.error() ) {
+            case frico::parse_error::invalid_input:
+                std::cerr << "Malformed range expression for -R\n";
+                return {};
+            case frico::parse_error::out_of_range:
+                std::cerr << "Invalid range for -R\n";
+                return {};
+            default:
+                std::unreachable();
+            }
+        }
+    }
+
+    std::unreachable();
+}
+
+
+int main(int argc, char **argv)
+{
+    //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
+
+    std::cout <<
+        "FRICO v0.0 3D MoM solver - Matteo Cicuttin [IV3IWE] (C) 2025-2026\n\n";
+    
+    frico::simulation sim;
+
+    const char *arg_geo_path = nullptr;
+    const char *arg_skiptags = nullptr;
+    const char *arg_frequency = nullptr;
+    const char *arg_range_expr = nullptr;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "Af:g:k:s:SR:x:")) != -1) {
+        switch (opt) {
+        case 'A':
+            sim.cfg.approx_matrix = true;
+            break;
+        case 'f':
+            arg_frequency = optarg;
+            break;
+        case 'g':
+            arg_geo_path = optarg;
+            break;
+        case 'k':
+            sim.cfg.degree = std::stoull(optarg);
+            break;
+        case 's':
+            sim.cfg.silo_path = optarg;
+            break;
+        case 'S':
+            sim.cfg.force_symmetry = true;
+            break;
+        case 'R':
+            arg_range_expr = optarg;
+            break;
+        case 'x':
+            arg_skiptags = optarg;
+            break;
+
+        default:
+            std::cerr << "Invalid argument\n";
+            return EXIT_FAILURE;
+        }
+    }
+
+    #if 0
+    /* (1) Check if geometry was specified */
+    if (arg_geo_path == nullptr) {
+        std::cerr << "No geometry specified (-g)\n";
+        return EXIT_FAILURE;
+    }
+    #endif
+    /* (2) Check if frequency was specified, either single or sweep */
+    auto opt_freqs = parse_frequency_parameters(arg_frequency, arg_range_expr);
+    if (not opt_freqs) {
+        return EXIT_FAILURE;
+    }
+
+    std::cout << opt_freqs->step << " " << opt_freqs->step;
+    std::cout << " " << opt_freqs->end << "\n";
+
+    return EXIT_SUCCESS;
+
+    if ( not frico::init_simulation(sim, "default", arg_geo_path) ) {
+        return EXIT_FAILURE;
+    }
+
+
+
+    //frico::init_sweep(sim, *opt_freqs);
+
+    //frico::run_sweep(sim);
+
+    return EXIT_SUCCESS;
+}
+
+
+
+
+#if 0
+
 int main(int argc, char **argv)
 {
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
@@ -513,6 +685,7 @@ int main(int argc, char **argv)
     cfg.degree = 2;
 
     const char *arg_skiptags = nullptr;
+    const char *arg_range_expr = nullptr;
 
     int opt;
     while ((opt = getopt(argc, argv, "Af:g:k:s:SR:x:")) != -1) {
@@ -536,7 +709,7 @@ int main(int argc, char **argv)
             cfg.force_symmetry = true;
             break;
         case 'R':
-            cfg.range_expr = optarg;
+            arg_range_expr = optarg;
             break;
         case 'x':
             arg_skiptags = optarg;
@@ -555,7 +728,7 @@ int main(int argc, char **argv)
     }
 
     /* (2) Check if frequency was specified, either single or sweep */
-    if ( (cfg.frequency <= 0) and (cfg.range_expr == nullptr) ) {
+    if ( (cfg.frequency <= 0) and (arg_range_expr == nullptr) ) {
         std::cerr << "Simulation frequency not specified (-f or -R)" << std::endl;
         return EXIT_FAILURE;
     }
@@ -645,8 +818,8 @@ int main(int argc, char **argv)
     #endif
 
 
-    if (cfg.range_expr) {
-        auto exp_range = frico::parse_frequency_range(cfg.range_expr);
+    if (arg_range_expr) {
+        auto exp_range = frico::parse_frequency_range(arg_range_expr);
         if ( not exp_range.has_value() ) {
             switch ( exp_range.error() ) {
             case frico::parse_error::invalid_input:
@@ -954,3 +1127,4 @@ int main(int argc, char **argv)
     return 0;
 }
 
+#endif
