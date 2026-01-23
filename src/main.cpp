@@ -43,82 +43,56 @@ namespace frico {
 
 struct config
 {
-    const char *    gmsh_geo_path = nullptr;
-    const char *    silo_path = "test.silo";
-    double          frequency = -1;
     size_t          degree = 1;
     bool            approx_matrix = false;
     bool            force_symmetry = false;
 };
+struct freq_context {
+    size_t                      ctx_number; // Incremental context number
+    double                      frequency;  // Frequency
+    zdmatrix                    Z;          // Impedance matrix
+    zdvector                    V;          // Voltage vector (rhs)
+    zdvector                    I;          // Current vector (unknown)
+    zdfield                     tri_J;      // Tri-by-tri current density
+    zdfield                     tri_AJ;     
+    zdvector                    tri_AdivJ;
+};
 
-ddvector prjtest(const mesh& msh, const std::vector<basis_function>& bfs)
-{
-    ddmatrix mass = ddmatrix::Zero(bfs.size(), bfs.size());
-    ddvector rhs = ddvector::Zero(bfs.size());
+enum class simulation_type {
+    antenna,
+    radar
+};
 
-    std::vector<size_t> cmap;
-    cmap.resize( msh.edges.size() );
-    for (const auto& bf : bfs) {
-        cmap[bf.edge_index] = bf.matrix_index;
-    }
+struct simulation {
+    std::string                 name;       // Simulation name
+    simulation_type             type;       // Type of simulation
+    config                      cfg;        // Simulation config
+    mesh                        msh;        // Mesh
+    std::vector<int>            skiptags;   // Surfaces to skip
+    std::vector<basis_function> bfuncs;     // Basis functions
+    std::vector<freq_context>   contexts;   // Data for each frequency
+    std::unique_ptr<excitation> excit;
+};
 
-    for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
-        const auto& tri = msh.triangles[itri];
-        const auto& tbi = msh.tbis[itri];
-
-        auto qps = integrate(msh, tri, 2);
-        for (const auto& qp : qps) {
-            for (size_t i = 0; i < 3; i++) {
-                if (not tbi[i]) { continue; }
-                auto bi = *tbi[i];
-                auto gi = cmap[ bi.edge_index ];
-                const auto& ibf = bfs[ gi ];
-                edvec3 ibfval = (bi.sign > 0)?
-                    ibf.eval_plus(qp.p) : ibf.eval_minus(qp.p);
-
-                for (size_t j = 0; j < 3; j++) {
-                    if (not tbi[j]) { continue; }
-                    auto bj = *tbi[j];
-                    auto gj = cmap[ bj.edge_index ];
-                    const auto& jbf = bfs[ gj ];
-                    edvec3 jbfval = (bj.sign > 0)?
-                        jbf.eval_plus(qp.p) : jbf.eval_minus(qp.p);
-
-                    mass(gi,gj) += qp.w * jbfval.dot(ibfval);
-                }
-
-                edvec3 f{1.0 - qp.p.y(), 1.0 - qp.p.x(), 0};
-                rhs(gi) += qp.w * f.dot(ibfval);
-            }
-        }
-    }
-
-    ddvector sol = mass.lu().solve(rhs);
-
-    H5Easy::File file("proj.h5", H5Easy::File::Truncate);
-    file.createDataSet("proj/Z", mass);
-    file.createDataSet("proj/b", rhs);
-    file.createDataSet("proj/x", sol);
-
-    return sol;
-}
 
 void
-compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
-    zdmatrix& Z, const config& cfg)
+compute_matrix(simulation& sim, size_t ctx_number)
 {
-    double freq = cfg.frequency;
+    auto& context = sim.contexts[ctx_number];
+    const auto& msh = sim.msh;
+
+    double freq = context.frequency;
     double omega = 2.0*M_PI*freq;
     double k = omega*std::sqrt(MU0*EPS0);
     double inv_ksq = 1./(omega*omega*MU0*EPS0);
 
-    for (const auto& ibf : bfs) {
+    for (const auto& ibf : sim.bfuncs) {
         const auto& iTminus = msh.triangles[ibf.itminus];
         const auto& iTplus = msh.triangles[ibf.itplus];
-        auto iqps_minus = integrate(msh, iTminus, cfg.degree);
-        auto iqps_plus = integrate(msh, iTplus, cfg.degree);
+        auto iqps_minus = integrate(msh, iTminus, sim.cfg.degree);
+        auto iqps_plus = integrate(msh, iTplus, sim.cfg.degree);
 
-        for (const auto& jbf : bfs) {
+        for (const auto& jbf : sim.bfuncs) {
             const auto& jTminus = msh.triangles[jbf.itminus];
             const auto& jTplus = msh.triangles[jbf.itplus];
 
@@ -128,12 +102,12 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                 (jbf.itplus == ibf.itminus) or (jbf.itplus == ibf.itplus);
 
             auto jqps_minus = split_minus?
-                integrate_subtri(msh, jTminus, cfg.degree) :
-                integrate(msh, jTminus, cfg.degree);
+                integrate_subtri(msh, jTminus, sim.cfg.degree) :
+                integrate(msh, jTminus, sim.cfg.degree);
 
             auto jqps_plus = split_plus?
-                integrate_subtri(msh, jTplus, cfg.degree) :
-                integrate(msh, jTplus, cfg.degree);
+                integrate_subtri(msh, jTplus, sim.cfg.degree) :
+                integrate(msh, jTplus, sim.cfg.degree);
 
             std::complex<double> entry = 0.0;
             double prodl = 0.25 * ibf.length * jbf.length * M_1_PI;
@@ -194,31 +168,32 @@ compute_matrix(const mesh& msh, const std::vector<basis_function>& bfs,
                 }
             }
 
-            Z(jbf.matrix_index, ibf.matrix_index) = entry;
+            context.Z(jbf.matrix_index, ibf.matrix_index) = entry;
         } // for jbf
     } // for ibf
 }
 
 void
-compute_matrix_approx(const mesh& msh, const std::vector<basis_function>& bfs,
-    zdmatrix& Z, const config& cfg)
+compute_matrix_approx(simulation& sim, size_t ctx_number)
 {
-    double freq = cfg.frequency;
+    auto& context = sim.contexts[ctx_number];
+    const auto& msh = sim.msh;
+
+    double freq = context.frequency;
     double omega = 2.0*M_PI*freq;
     double k = omega*std::sqrt(MU0*EPS0);
     double inv_ksq = 1./(omega*omega*MU0*EPS0);
 
     double sqrt_4pi = std::sqrt(4*M_PI);
- 
-    double dmax = 0.0;
 
-    for (const auto& ibf : bfs) {
+    #pragma omp parallel for
+    for (const auto& ibf : sim.bfuncs) {
         const auto& iTminus = msh.triangles[ibf.itminus];
         const auto& iTplus = msh.triangles[ibf.itplus];
         auto iTminusbar = barycenter(msh, iTminus);
         auto iTplusbar = barycenter(msh, iTplus);
 
-        for (const auto& jbf : bfs) {
+        for (const auto& jbf : sim.bfuncs) {
             const auto& jTminus = msh.triangles[jbf.itminus];
             const auto& jTplus = msh.triangles[jbf.itplus];
             auto jTminusbar = barycenter(msh, jTminus);
@@ -271,56 +246,29 @@ compute_matrix_approx(const mesh& msh, const std::vector<basis_function>& bfs,
             }
             entry += ibf.length*jbf.length*(0.25*rho_cpp*Gpp - inv_ksq*Gpp);
 
-            Z(jbf.matrix_index, ibf.matrix_index) = entry;
+            context.Z(jbf.matrix_index, ibf.matrix_index) = entry;
         } // for jbf
     } // for ibf
-
-    std::cout<< "dmax = "<< dmax << "\n";
 }
 
 void
-compute_rhs(const mesh& msh, const std::vector<basis_function>& bfs,
-    zdvector& b, const config& cfg)
+compute_rhs(simulation& sim, size_t ctx_number)
 {
-    double freq = cfg.frequency;
+    auto& context = sim.contexts[ctx_number];
+    const auto& msh = sim.msh;
+
+    double freq = context.frequency;
     double omega = 2.0*M_PI*freq;
     double wn = omega*std::sqrt(MU0*EPS0);
 
-    edvec3 E = {1.0, 0.0, 0.0};
-
-    for (const auto& ibf : bfs) {
+    for (const auto& ibf : sim.bfuncs) {
     
         if (not ibf.interface) {
             continue;
         }
-    
-        auto itf_tag = ibf.interface.value();
-        //if (itf_tag != 3) continue;
-        //std::cout << "rhs: itf tag " << itf_tag << " idx " << ibf.matrix_index << "\n";
-
-        double val = 0.0;
-
-        const auto& Tminus = msh.triangles[ibf.itminus];
-        const auto& qpsminus = frico::integrate(msh, Tminus, 1);
-        for (auto& qp : qpsminus) {
-            val += qp.w * E.dot(ibf.eval_minus(qp.p)); 
-        }
-
-
-        const auto& Tplus = msh.triangles[ibf.itplus];
-        const auto& qpsplus = frico::integrate(msh, Tplus, 1);
-        for (auto& qp : qpsplus) {
-            val += qp.w * E.dot(ibf.eval_plus(qp.p)); 
-        }
-
-        auto e = msh.edges[ibf.edge_index];
-        auto bar = barycenter(msh, e);
-
-        //std::cout << val << " " << ibf.rho_plus(bar) << std::endl;
 
         std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
-
-        b(ibf.matrix_index) = entry;//std::complex<double>{0.0, -val/(omega*MU0)};
+        context.V(ibf.matrix_index) = entry;
     }
 }
 
@@ -352,15 +300,25 @@ bool make_sampling_sphere(frico::mesh& msh, const frico::point& center, double r
     return true;
 }
 
-bool make_sampling_rectangle(frico::mesh& msh, const frico::point& center, double h)
+bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
+    double r, double h)
 {
     gmsh::initialize();
     gmsh::option::setNumber("General.Verbosity", 1);
 
     gmsh::model::add("sampling");
 
-    //gmsh::model::occ::addCircle(center.x(), center.y(), center.z(), r);
-    gmsh::model::occ::addRectangle(-5, -5, 0.0, 10, 10);
+    int tagxy = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
+    int tagyz = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
+    int tagxz = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
+    gmsh::model::occ::rotate({{2, tagyz}},
+        c.x(), c.y(), c.z(), c.x(), c.y()+1, c.z(), M_PI/2 );
+    gmsh::model::occ::rotate({{2, tagxz}},
+        c.x(), c.y(), c.z(), c.x()+1, c.y(), c.z(), M_PI/2 );
+
+    gmsh::vectorpair out;
+    std::vector<gmsh::vectorpair> outmap;
+    gmsh::model::occ::fuse({ {2,tagxy}  }, {{2,tagyz}, {2,tagxz}}, out, outmap);
 
     gmsh::model::occ::synchronize();
 
@@ -379,27 +337,6 @@ bool make_sampling_rectangle(frico::mesh& msh, const frico::point& center, doubl
 }
 
 namespace frico {
-struct freq_context {
-    size_t                      ctx_number; // Incremental context number
-    double                      frequency;  // Frequency
-    zdmatrix                    Z;          // Impedance matrix
-    zdvector                    V;          // Voltage vector (rhs)
-    zdvector                    I;          // Current vector (unknown)
-    zdfield                     tri_J;      // Tri-by-tri current density
-    zdfield                     tri_AJ;     
-    zdvector                    tri_AdivJ;
-};
-
-
-struct simulation {
-    std::string                 name;       // Simulation name
-    config                      cfg;        // Simulation config
-    mesh                        msh;        // Mesh
-    std::vector<int>            skiptags;   // Surfaces to skip
-    std::vector<basis_function> bfuncs;     // Basis functions
-    std::vector<freq_context>   contexts;   // Data for each frequency
-    std::unique_ptr<excitation> excit;
-};
 
 bool init_simulation(simulation& sim, const std::string& name,
     const std::string& geo_path)
@@ -459,29 +396,29 @@ bool run_context(simulation& sim, size_t ctx_number)
     context.Z = zdmatrix::Zero(system_size, system_size);
     context.V = zdvector::Zero(system_size);
 
-    std::cout << "  Assemblying linear system...\n";
+    std::cout << "  Assemblying linear system..." << std::flush;
     const auto asm_start{std::chrono::steady_clock::now()};
     if (sim.cfg.approx_matrix) {
-        compute_matrix_approx(sim.msh, sim.bfuncs, context.Z, sim.cfg);
+        compute_matrix_approx(sim, ctx_number);
     } else {
-        compute_matrix(sim.msh, sim.bfuncs, context.Z, sim.cfg);
+        compute_matrix(sim, ctx_number);
     }
     
-    compute_rhs(sim.msh, sim.bfuncs, context.V, sim.cfg);
+    compute_rhs(sim, ctx_number);
     
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
-    std::cout << "  ASM time: " << asm_elapsed_seconds << " seconds\n";
+    std::cout << asm_elapsed_seconds << " seconds\n";
     if (sim.cfg.force_symmetry) {
         context.Z = (context.Z+context.Z.transpose())/2.0;
     }
 
-    std::cout << "  Solving linear system...\n";
+    std::cout << "  Solving linear system..." << std::flush;
     const auto start{std::chrono::steady_clock::now()};
     context.I = context.Z.lu().solve(context.V);
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
-    std::cout << "  Solve time: " << elapsed_seconds << " seconds\n";
+    std::cout << elapsed_seconds << " seconds\n";
 
     context.tri_AJ = zdfield::Zero(sim.msh.triangles.size(), 3);
     context.tri_AdivJ = zdvector::Zero(sim.msh.triangles.size());
@@ -512,19 +449,171 @@ bool run_context(simulation& sim, size_t ctx_number)
         context.tri_J.row(bf.itplus) += Jplus;
     }
 
+    std::complex<double> I = 0.0;
+    for (const auto& ibf : sim.bfuncs) {
+        if (not ibf.interface) {
+            continue;
+        }
+
+        //if (ibf.interface.value() == 3)
+            I += ibf.length*context.I(ibf.matrix_index);
+    }
+    auto z = 1./I;
+
+    std::complex<double> gamma = (z - 50.0)/(z + 50.0);
+    double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
+            
+    std::cout << z << " " << swr << std::endl;
+
+    return true;
+}
+
+bool make_radiation_diagrams(simulation& sim, size_t ctx_number,
+    const point& center, double radius)
+{
+    freq_context& context = sim.contexts[ctx_number];
+    const mesh& msh = sim.msh;
+    
+    double freq = context.frequency;double omega = 2.0*M_PI*freq;
+    double k = omega*std::sqrt(MU0*EPS0);
+    std::complex<double> jomega{0.0, omega};
+
+    frico::zdfield Exy = frico::zdfield::Zero(360, 3);
+    frico::zdfield Eyz = frico::zdfield::Zero(360, 3);
+    frico::zdfield Exz = frico::zdfield::Zero(360, 3);
+
+    for (int deg = 0; deg < 360; deg++) {
+        double theta = deg*M_PI/180;
+        double R = 5.0;
+        
+        for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+            const auto& tri = msh.triangles[itri];
+            auto bar = barycenter(msh, tri);
+            frico::ezvec3 J = context.tri_AJ.row(itri);
+            std::complex<double> divJ = context.tri_AdivJ(itri);
+
+            /* XY */ {
+                frico::point Pxy{ R*std::cos(theta), R*std::sin(theta), 0.0 };
+                frico::vec3 vR = Pxy - bar;
+                double R = norm(vR);
+                std::complex<double> jkR{0.0, k*R};
+                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+                Exy.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
+            }
+
+            /* YZ */ {
+                frico::point Pyz{ 0.0, R*std::cos(theta), R*std::sin(theta) };
+                frico::vec3 vR = Pyz - bar;
+                double R = norm(vR);
+                std::complex<double> jkR{0.0, k*R};
+                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+                Eyz.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
+            }
+
+            /* XZ */ {
+                frico::point Pxz{ R*std::cos(theta), 0.0, -R*std::sin(theta) };
+                frico::vec3 vR = Pxz - bar;
+                double R = norm(vR);
+                std::complex<double> jkR{0.0, k*R};
+                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+                Exz.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
+            }
+        }
+    }
+
+    double magExy_max = 0.0;
+    double magEyz_max = 0.0;
+    double magExz_max = 0.0;
+    for (int i = 0; i < 360; i++) {
+        { double magExy = std::sqrt(std::real(Exy.row(i).dot(Exy.row(i))));
+          magExy_max = std::max(magExy_max, magExy); }
+        { double magEyz = std::sqrt(std::real(Eyz.row(i).dot(Eyz.row(i))));
+          magEyz_max = std::max(magEyz_max, magEyz); }
+        { double magExz = std::sqrt(std::real(Exz.row(i).dot(Exz.row(i))));
+          magExz_max = std::max(magExz_max, magExz); }
+    }
+
+    std::string filename = "polar_" + std::to_string(ctx_number) + ".txt";
+    std::ofstream ofs(filename);
+    for (int i = 0; i < 360; i++) {
+        double magExy = std::sqrt(std::real(Exy.row(i).dot(Exy.row(i))));
+        double magEyz = std::sqrt(std::real(Eyz.row(i).dot(Eyz.row(i))));
+        double magExz = std::sqrt(std::real(Exz.row(i).dot(Exz.row(i))));
+        ofs << i << " " << magExy << " " << 20*std::log10(magExy/magExy_max)
+                 << " " << magEyz << " " << 20*std::log10(magEyz/magEyz_max)
+                 << " " << magExz << " " << 20*std::log10(magExz/magExz_max)
+                 << std::endl;
+    }
+
+    return true;
+}
+
+bool eval_fields(const simulation& sim, size_t ctx_number,
+    const mesh& smpmsh, zdfield& data)
+{
+    data = zdfield::Zero(smpmsh.vertices.size(), 3);
+
+    const freq_context& context = sim.contexts[ctx_number];
+    const mesh& msh = sim.msh;
+
+    double freq = context.frequency;
+    double omega = 2.0*M_PI*freq;
+    double k = omega*std::sqrt(MU0*EPS0);
+    std::complex<double> jomega{0.0, omega};
+
+    for (size_t i = 0; i < smpmsh.vertices.size(); i++) {
+        const auto& spt = smpmsh.vertices[i]; 
+        frico::ezvec3 locE = frico::ezvec3::Zero();
+        for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+            const auto& tri = msh.triangles[itri];
+            frico::vec3 bar = frico::barycenter(msh, tri);
+            double R = norm(spt - bar);
+            std::complex<double> jkR{0, k*R};
+            std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
+            frico::ezvec3 J = context.tri_AJ.row(itri);
+            std::complex<double> divJ = context.tri_AdivJ(itri);
+            locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
+        }
+        data.row(i) = locE;
+    }
+
     return true;
 }
 
 bool postpro_context(simulation& sim, size_t ctx_number)
 {
-    return false;
+    freq_context& context = sim.contexts[ctx_number];
+
+    std::string filename =
+        sim.name + "_" + std::to_string(ctx_number) + ".silo";
+
+    silo db;
+    db.open(filename);
+    db.add_mesh("mesh", sim.msh);
+    db.add_variable("mesh", "J", context.tri_J, var_centering::zonal);
+
+    
+
+    mesh smpmsh;
+    zdfield data;
+    make_sampling_grid(smpmsh, {0,0,0}, 5, 0.1);
+    db.add_mesh("sampling", smpmsh);
+    eval_fields(sim, ctx_number, smpmsh, data);
+    db.add_variable("sampling", "E", data, var_centering::nodal);
+
+    db.close();
+
+    
+    make_radiation_diagrams(sim, ctx_number, {0,0,0}, 5.0);
+    
+    return true;
 }
 
-bool run_sweep(simulation& sim)
+bool run(simulation& sim)
 {
     for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
         run_context(sim, ctx_num);
-        /* call postpro */
+        postpro_context(sim, ctx_num);
 
         /* dealloc matrix when we're done */
         sim.contexts[ctx_num].Z.resize(0,0);
@@ -548,8 +637,6 @@ parse_frequency_parameters(const char *arg_frequency, const char *arg_range_expr
         return {};
     }
 
-    std::cout << arg_frequency << " " << arg_range_expr << "\n";
-
     if ( arg_frequency ) {
         try {
             double frequency = std::stod(arg_frequency);
@@ -560,7 +647,7 @@ parse_frequency_parameters(const char *arg_frequency, const char *arg_range_expr
             };
         }
         catch (...) {
-            std::cerr << "Error parsing the parameter of -f\n";
+            std::cerr << "Error parsing the argument of -f\n";
             return {};
         }
     }
@@ -568,11 +655,10 @@ parse_frequency_parameters(const char *arg_frequency, const char *arg_range_expr
     if ( arg_range_expr ) {
         auto exp_range = frico::parse_frequency_range(arg_range_expr);
         if ( exp_range.has_value() ) {
-            std::cout << exp_range->start << " " << exp_range->step;
-            std::cout << " " << exp_range->end << "\n";
-            return exp_range.value();
-        } else {
-            switch ( exp_range.error() ) {
+            return *exp_range;
+        }
+        
+        switch ( exp_range.error() ) {
             case frico::parse_error::invalid_input:
                 std::cerr << "Malformed range expression for -R\n";
                 return {};
@@ -580,12 +666,11 @@ parse_frequency_parameters(const char *arg_frequency, const char *arg_range_expr
                 std::cerr << "Invalid range for -R\n";
                 return {};
             default:
-                std::unreachable();
-            }
+                return {};
         }
     }
 
-    std::unreachable();
+    return {};
 }
 
 
@@ -619,7 +704,7 @@ int main(int argc, char **argv)
             sim.cfg.degree = std::stoull(optarg);
             break;
         case 's':
-            sim.cfg.silo_path = optarg;
+            //sim.cfg.silo_path = optarg;
             break;
         case 'S':
             sim.cfg.force_symmetry = true;
@@ -637,33 +722,36 @@ int main(int argc, char **argv)
         }
     }
 
-    #if 0
     /* (1) Check if geometry was specified */
     if (arg_geo_path == nullptr) {
         std::cerr << "No geometry specified (-g)\n";
         return EXIT_FAILURE;
     }
-    #endif
+
     /* (2) Check if frequency was specified, either single or sweep */
     auto opt_freqs = parse_frequency_parameters(arg_frequency, arg_range_expr);
     if (not opt_freqs) {
         return EXIT_FAILURE;
     }
 
-    std::cout << opt_freqs->step << " " << opt_freqs->step;
-    std::cout << " " << opt_freqs->end << "\n";
+    /* (3) If there is a list of surfaces to skip, process it */
+    if (arg_skiptags) {
+        auto exp_skiptags = frico::parse_integer_list(arg_skiptags);
+        if (exp_skiptags.has_value()) {
+            sim.skiptags = *exp_skiptags;
+        } else {
+            std::cerr << "Error parsing the argument of -x\n";
+            return EXIT_FAILURE;
+        }
+    }
 
-    return EXIT_SUCCESS;
 
     if ( not frico::init_simulation(sim, "default", arg_geo_path) ) {
         return EXIT_FAILURE;
     }
 
-
-
-    //frico::init_sweep(sim, *opt_freqs);
-
-    //frico::run_sweep(sim);
+    frico::init_sweep(sim, *opt_freqs);
+    frico::run(sim);
 
     return EXIT_SUCCESS;
 }
