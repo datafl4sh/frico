@@ -84,7 +84,14 @@ endif()
 ######################################################################
 ## Sources and targets
 
-find_package(OpenMP)
+option(OPT_ENABLE_OPENMP "Enable OpenMP" ON)
+if (OPT_ENABLE_OPENMP)
+    find_package(OpenMP)
+    if (OpenMP_FOUND)
+        set(LINK_LIBS ${LINK_LIBS} OpenMP::OpenMP_CXX)
+    endif()
+endif()
+
 
 set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
             src/output_silo.cpp src/quadratures.cpp src/rwg_basis.cpp
@@ -93,6 +100,4 @@ set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
 
 add_executable(frico ${SOURCES})
 
-target_link_libraries(frico PUBLIC
-    ${LINK_LIBS}# OpenMP::OpenMP_CXX
-)
+target_link_libraries(frico PUBLIC ${LINK_LIBS})

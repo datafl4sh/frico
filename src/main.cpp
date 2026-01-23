@@ -86,6 +86,7 @@ compute_matrix(simulation& sim, size_t ctx_number)
     double k = omega*std::sqrt(MU0*EPS0);
     double inv_ksq = 1./(omega*omega*MU0*EPS0);
 
+    #pragma omp parallel for
     for (const auto& ibf : sim.bfuncs) {
         const auto& iTminus = msh.triangles[ibf.itminus];
         const auto& iTplus = msh.triangles[ibf.itplus];
@@ -577,7 +578,7 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
 
             frico::ezvec3 RcrossJ = (spt - bar).to_eigen().cross(J);
             std::complex<double> zz = (1.0 + jkR)/(4*M_PI*R*R*R);
-            locH = -RcrossJ * zz;
+            locH = -RcrossJ * zz * std::exp(-jkR);
         }
         data.row(i) = locH;
     }
@@ -683,9 +684,15 @@ int main(int argc, char **argv)
 {
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
+    #ifndef _OPENMP
     std::cout <<
-        "FRICO v0.0 3D MoM solver - Matteo Cicuttin [IV3IWE] (C) 2025-2026\n\n";
-    
+        "FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026\n\n";
+    #else
+    std::cout <<
+        "FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026 ";
+    std::cout << "[OpenMP]\n\n";
+    #endif
+
     frico::simulation sim;
 
     const char *arg_geo_path = nullptr;
