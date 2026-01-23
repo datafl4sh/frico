@@ -550,9 +550,10 @@ bool make_radiation_diagrams(simulation& sim, size_t ctx_number,
 }
 
 bool eval_fields(const simulation& sim, size_t ctx_number,
-    const mesh& smpmsh, zdfield& data)
+    const mesh& smpmsh, zdfield& E, zdfield& H)
 {
-    data = zdfield::Zero(smpmsh.vertices.size(), 3);
+    E = zdfield::Zero(smpmsh.vertices.size(), 3);
+    H = zdfield::Zero(smpmsh.vertices.size(), 3);
 
     const freq_context& context = sim.contexts[ctx_number];
     const mesh& msh = sim.msh;
@@ -562,6 +563,7 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
     double k = omega*std::sqrt(MU0*EPS0);
     std::complex<double> jomega{0.0, omega};
 
+    #pragma omp parallel for
     for (size_t i = 0; i < smpmsh.vertices.size(); i++) {
         const auto& spt = smpmsh.vertices[i]; 
         frico::ezvec3 locE = frico::ezvec3::Zero();
@@ -574,13 +576,20 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
             std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
             frico::ezvec3 J = context.tri_AJ.row(itri);
             std::complex<double> divJ = context.tri_AdivJ(itri);
-            locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
+            //locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
 
-            frico::ezvec3 RcrossJ = (spt - bar).to_eigen().cross(J);
-            std::complex<double> zz = (1.0 + jkR)/(4*M_PI*R*R*R);
-            locH = -RcrossJ * zz * std::exp(-jkR);
+            std::complex<double> G1 = (-1.0 - jkR + k*k*R*R)/(4*M_PI*R*R*R);
+            std::complex<double> G2 = (3.0 + 3.0*jkR - k*k*R*R)/(4*M_PI*R*R*R*R*R);
+            ezvec3 B = ((spt-bar).to_eigen().dot(J))*(spt-bar).to_eigen();
+            locE += (G1*J + B*G2)*std::exp(-jkR);
+
+            frico::ezvec3 RcrossJ = (spt - bar).to_eigen().cross(J)/R;
+            std::complex<double> gradg = 
+                ((1.0 + jkR)/(4*M_PI*R*R)) * std::exp(-jkR);
+            locH += -RcrossJ * gradg;
         }
-        data.row(i) = locH;
+        E.row(i) = locE;
+        H.row(i) = locH;
     }
 
     return true;
@@ -601,11 +610,12 @@ bool postpro_context(simulation& sim, size_t ctx_number)
     
 
     mesh smpmsh;
-    zdfield data;
+    zdfield E, H;
     make_sampling_grid(smpmsh, {0,0,0}, 5, 0.1);
     db.add_mesh("sampling", smpmsh);
-    eval_fields(sim, ctx_number, smpmsh, data);
-    db.add_variable("sampling", "E", data, var_centering::nodal);
+    eval_fields(sim, ctx_number, smpmsh, E, H);
+    db.add_variable("sampling", "E", E, var_centering::nodal);
+    db.add_variable("sampling", "H", H, var_centering::nodal);
 
     db.close();
 
