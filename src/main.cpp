@@ -564,6 +564,7 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
     for (size_t i = 0; i < smpmsh.vertices.size(); i++) {
         const auto& spt = smpmsh.vertices[i]; 
         frico::ezvec3 locE = frico::ezvec3::Zero();
+        frico::ezvec3 locH = frico::ezvec3::Zero();
         for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
             const auto& tri = msh.triangles[itri];
             frico::vec3 bar = frico::barycenter(msh, tri);
@@ -573,8 +574,12 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
             frico::ezvec3 J = context.tri_AJ.row(itri);
             std::complex<double> divJ = context.tri_AdivJ(itri);
             locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
+
+            frico::ezvec3 RcrossJ = (spt - bar).to_eigen().cross(J);
+            std::complex<double> zz = (1.0 + jkR)/(4*M_PI*R*R*R);
+            locH = -RcrossJ * zz;
         }
-        data.row(i) = locE;
+        data.row(i) = locH;
     }
 
     return true;
