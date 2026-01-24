@@ -256,11 +256,9 @@ void
 compute_rhs(simulation& sim, size_t ctx_number)
 {
     auto& context = sim.contexts[ctx_number];
-    const auto& msh = sim.msh;
 
     double freq = context.frequency;
     double omega = 2.0*M_PI*freq;
-    double wn = omega*std::sqrt(MU0*EPS0);
 
     for (const auto& ibf : sim.bfuncs) {
     
@@ -469,56 +467,75 @@ bool run_context(simulation& sim, size_t ctx_number)
     return true;
 }
 
-bool make_radiation_diagrams(simulation& sim, size_t ctx_number,
+std::pair<ezvec3, ezvec3>
+eval_fields(const simulation& sim, size_t ctx_number, const point& pt)
+{
+    const freq_context& context = sim.contexts[ctx_number];
+    const mesh& msh = sim.msh;
+
+    const double freq = context.frequency;
+    const double omega = 2.0*M_PI*freq;
+    const double k = omega*std::sqrt(MU0*EPS0);
+    const std::complex<double> jomega{0.0, omega};
+    const std::complex<double> jk{0.0, k};
+
+    frico::ezvec3 E = frico::ezvec3::Zero();
+    frico::ezvec3 H = frico::ezvec3::Zero();
+    for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
+        const auto& tri = msh.triangles[itri];
+        const frico::vec3 bar = frico::barycenter(msh, tri);
+        const edvec3 vR = (pt - bar).to_eigen();
+        const double R = norm(pt - bar);
+        const double _4piR = 4*M_PI*R;
+        const double _4piR3 = 4*M_PI*R*R*R;
+
+        std::complex<double> jkR{0, k*R};
+        std::complex<double> g = (std::exp(-jkR)/_4piR);
+        frico::ezvec3 J = context.tri_AJ.row(itri);
+        std::complex<double> divJ = context.tri_AdivJ(itri);
+        E += -jomega*MU0*(J - divJ*(1.0+jkR)*vR/(std::pow(k*R, 2)))*g;
+
+        frico::ezvec3 RcrossJ = vR.cross(J);
+        std::complex<double> gradg = 
+            -((1.0 + jkR)/_4piR3) * std::exp(jkR);
+        H += RcrossJ * gradg;
+    }
+
+    return {E,H};
+}
+
+bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
     const point& center, double radius)
 {
-    freq_context& context = sim.contexts[ctx_number];
     const mesh& msh = sim.msh;
-    
-    double freq = context.frequency;double omega = 2.0*M_PI*freq;
-    double k = omega*std::sqrt(MU0*EPS0);
-    std::complex<double> jomega{0.0, omega};
 
     frico::zdfield Exy = frico::zdfield::Zero(360, 3);
     frico::zdfield Eyz = frico::zdfield::Zero(360, 3);
     frico::zdfield Exz = frico::zdfield::Zero(360, 3);
 
+    #pragma omp parallel for
     for (int deg = 0; deg < 360; deg++) {
         double theta = deg*M_PI/180;
+        double c = std::cos(theta);
+        double s = std::sin(theta);
         double R = 5.0;
-        
-        for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
-            const auto& tri = msh.triangles[itri];
-            auto bar = barycenter(msh, tri);
-            frico::ezvec3 J = context.tri_AJ.row(itri);
-            std::complex<double> divJ = context.tri_AdivJ(itri);
+  
+        /* XY */ {
+            frico::point Pxy{ R*c, R*s, 0.0 };
+            auto [locE, locH] = eval_fields(sim, ctx_number, Pxy);
+            Exy.row(deg) = locE;
+        }
 
-            /* XY */ {
-                frico::point Pxy{ R*std::cos(theta), R*std::sin(theta), 0.0 };
-                frico::vec3 vR = Pxy - bar;
-                double R = norm(vR);
-                std::complex<double> jkR{0.0, k*R};
-                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
-                Exy.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
-            }
+        /* YZ */ {
+            frico::point Pyz{ 0.0, R*c, R*s };
+            auto [locE, locH] = eval_fields(sim, ctx_number, Pyz);
+            Eyz.row(deg) = locE;
+        }
 
-            /* YZ */ {
-                frico::point Pyz{ 0.0, R*std::cos(theta), R*std::sin(theta) };
-                frico::vec3 vR = Pyz - bar;
-                double R = norm(vR);
-                std::complex<double> jkR{0.0, k*R};
-                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
-                Eyz.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
-            }
-
-            /* XZ */ {
-                frico::point Pxz{ R*std::cos(theta), 0.0, -R*std::sin(theta) };
-                frico::vec3 vR = Pxz - bar;
-                double R = norm(vR);
-                std::complex<double> jkR{0.0, k*R};
-                std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
-                Exz.row(deg) += -jomega*MU0*(J - divJ*(1.0+jkR)*vR.to_eigen()/(k*k*R*R))*g;
-            }
+        /* XZ */ {
+            frico::point Pxz{ R*c, 0.0, -R*s };
+            auto [locE, locH] = eval_fields(sim, ctx_number, Pxz);
+            Exz.row(deg) = locE;
         }
     }
 
@@ -555,45 +572,10 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
     E = zdfield::Zero(smpmsh.vertices.size(), 3);
     H = zdfield::Zero(smpmsh.vertices.size(), 3);
 
-    const freq_context& context = sim.contexts[ctx_number];
-    const mesh& msh = sim.msh;
-
-    double freq = context.frequency;
-    double omega = 2.0*M_PI*freq;
-    double k = omega*std::sqrt(MU0*EPS0);
-    std::complex<double> jomega{0.0, omega};
-    std::complex<double> jk{0.0, k};
-
     #pragma omp parallel for
     for (size_t i = 0; i < smpmsh.vertices.size(); i++) {
         const auto& spt = smpmsh.vertices[i]; 
-        frico::ezvec3 locE = frico::ezvec3::Zero();
-        frico::ezvec3 locH = frico::ezvec3::Zero();
-        for (size_t itri = 0; itri < msh.triangles.size(); itri++) {
-            const auto& tri = msh.triangles[itri];
-            frico::vec3 bar = frico::barycenter(msh, tri);
-            double R = norm(spt - bar);
-            std::complex<double> jkR{0, k*R};
-            std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
-            frico::ezvec3 J = context.tri_AJ.row(itri);
-            std::complex<double> divJ = context.tri_AdivJ(itri);
-            locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
-
-            double r2 = R*R;
-            double r3 = r2*R;
-            double r4 = r3*R;
-            double r5 = r4*R;
-
-            std::complex<double> G1 = -1.0/(4*M_PI*r3) - jk/(4*M_PI*r2) + k*k/(4*M_PI*R);
-            std::complex<double> G2 = 3.0/(4*M_PI*r5) + 3.0*jk/(4*M_PI*r4) - k*k/(4*M_PI*r3);
-            ezvec3 B = ((spt-bar).to_eigen().dot(J))*(spt-bar).to_eigen();
-            //locE += (G1*J + B*G2)*std::exp(-jkR);
-
-            frico::ezvec3 RcrossJ = (spt - bar).to_eigen().cross(J)/R;
-            std::complex<double> gradg = 
-                ((1.0 + jkR)/(4*M_PI*R*R)) * std::exp(-jkR);
-            locH += -RcrossJ * gradg;
-        }
+        auto [locE, locH] = eval_fields(sim, ctx_number, spt);
         E.row(i) = locE;
         H.row(i) = locH;
     }
@@ -613,19 +595,26 @@ bool postpro_context(simulation& sim, size_t ctx_number)
     db.add_mesh("mesh", sim.msh);
     db.add_variable("mesh", "J", context.tri_J, var_centering::zonal);
 
-    
-
     mesh smpmsh;
     zdfield E, H;
     make_sampling_grid(smpmsh, {0,0,0}, 5, 0.1);
     db.add_mesh("sampling", smpmsh);
     eval_fields(sim, ctx_number, smpmsh, E, H);
+
+    zdvector Z = zdvector::Zero(smpmsh.vertices.size());
+    for (size_t i = 0; i < smpmsh.vertices.size(); i++) {
+        ezvec3 lE = E.row(i);
+        ezvec3 lH = H.row(i);
+        Z(i) = std::sqrt(lE.dot(lE))/std::sqrt(lH.dot(lH));
+    }
+
     db.add_variable("sampling", "E", E, var_centering::nodal);
     db.add_variable("sampling", "H", H, var_centering::nodal);
+    db.add_variable("sampling", "Z", Z, var_centering::nodal);
 
     db.close();
 
-    
+
     make_radiation_diagrams(sim, ctx_number, {0,0,0}, 5.0);
     
     return true;

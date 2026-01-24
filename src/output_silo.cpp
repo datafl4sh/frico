@@ -177,7 +177,7 @@ silo::add_variable(const std::string& mesh_name,
 bool
 silo::add_variable(const std::string& mesh_name,
     const std::string& var_name,
-    Eigen::Matrix<double, Eigen::Dynamic, 1>& var,
+    const Eigen::Matrix<double, Eigen::Dynamic, 1>& var,
     var_centering centering)
 {
     if (not db_) {
@@ -212,7 +212,31 @@ silo::add_variable(const std::string& mesh_name,
 bool
 silo::add_variable(const std::string& mesh_name,
     const std::string& var_name,
-    Eigen::Matrix<double, Eigen::Dynamic, 3>& var,
+    const Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>& var,
+    var_centering centering)
+{
+    if (not db_) {
+        return false;
+    }
+
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> re = var.real();
+    const Eigen::Matrix<double, Eigen::Dynamic, 1> im = var.imag();
+    
+    if ( not add_variable(mesh_name, var_name + "_re", re, centering) ) {
+        return false;
+    }
+    if ( not add_variable(mesh_name, var_name + "_im", im, centering) ) {
+        return false;
+    }
+
+    return true;
+}
+
+
+bool
+silo::add_variable(const std::string& mesh_name,
+    const std::string& var_name,
+    const Eigen::Matrix<double, Eigen::Dynamic, 3>& var,
     var_centering centering)
 {
     Eigen::VectorXd var_x = var.col(0);
@@ -252,7 +276,7 @@ silo::add_variable(const std::string& mesh_name,
 bool
 silo::add_variable(const std::string& mesh_name,
     const std::string& var_name,
-    Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 3>& var,
+    const Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 3>& var,
     var_centering centering)
 {
     /* Real part */
@@ -272,7 +296,7 @@ silo::add_variable(const std::string& mesh_name,
     /* Magnitude */
     Eigen::Matrix<double, Eigen::Dynamic, 1> abs =
         Eigen::Matrix<double, Eigen::Dynamic, 1>::Zero(var.rows());
-    for (size_t i = 0; i < var.rows(); i++) {
+    for (Eigen::Index i = 0; i < var.rows(); i++) {
         Eigen::Matrix<std::complex<double>, 3, 1> r = var.row(i);
         abs(i) = std::sqrt( r.dot(r).real() );
     }

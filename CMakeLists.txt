@@ -10,6 +10,7 @@ set (CMAKE_MODULE_PATH
 
 #set (CMAKE_CXX_FLAGS "-g -fsanitize=address")
 #set (CMAKE_CXX_FLAGS "-g")
+#set (CMAKE_CXX_FLAGS "-Wall")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

@@ -61,19 +61,25 @@ public:
 
     bool add_variable(const std::string& mesh_name,
         const std::string& var_name,
-        Eigen::Matrix<double, Eigen::Dynamic, 1>& var,
+        const Eigen::Matrix<double, Eigen::Dynamic, 1>& var,
         var_centering centering
     );
 
     bool add_variable(const std::string& mesh_name,
         const std::string& var_name,
-        Eigen::Matrix<double, Eigen::Dynamic, 3>& var,
+        const Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 1>& var,
         var_centering centering
     );
 
     bool add_variable(const std::string& mesh_name,
         const std::string& var_name,
-        Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 3>& var,
+        const Eigen::Matrix<double, Eigen::Dynamic, 3>& var,
+        var_centering centering
+    );
+
+    bool add_variable(const std::string& mesh_name,
+        const std::string& var_name,
+        const Eigen::Matrix<std::complex<double>, Eigen::Dynamic, 3>& var,
         var_centering centering
     );
 

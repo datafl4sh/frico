@@ -2,7 +2,7 @@ SetFactory("OpenCASCADE");
 
 freqMHz = 300;
 
-width = 0.002*3.141592;
+width = 0.0015*3.141592;
 
 Reflen  = 150/freqMHz;
 space1  = 0.20*300/freqMHz;

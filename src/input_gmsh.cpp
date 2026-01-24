@@ -82,7 +82,7 @@ gmsh_get_triangles(mesh& msh, const std::vector<std::optional<size_t>>& node_tag
 {
     gmsh::vectorpair entities;
     gmsh::model::getEntities(entities, 2/*dimension*/);
-    size_t subdom_id = 0;
+
     for (auto [dim, tag] : entities)
     {
         if ( skip_tag(skiptags, tag) ) {
@@ -129,8 +129,6 @@ gmsh_get_triangles(mesh& msh, const std::vector<std::optional<size_t>>& node_tag
                 msh.edges.push_back( {node2_ofs, node0_ofs} );
             }
         }
-
-        subdom_id++;
     }
 
     std::sort(msh.edges.begin(), msh.edges.end());
@@ -145,7 +143,7 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
 {
     gmsh::vectorpair entities;
     gmsh::model::getEntities(entities, 1/*dimension*/);
-    size_t subdom_id = 0;
+
     for (auto [dim, tag] : entities)
     {
         assert(dim == 1);
@@ -185,8 +183,6 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
                 msh.boundary_edges.push_back(bep);
             }
         }
-
-        subdom_id++;
     }
 }
 

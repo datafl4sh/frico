@@ -49,7 +49,7 @@ struct basis_function
     double  length;         // length of the edge
     size_t  edge_index;     // global edge index
     size_t  matrix_index;   // index of the edge in the matrix
-    std::optional<size_t>   interface; // if internal interface, its tag
+    std::optional<int>      interface; // if internal interface, its tag
 
     vec3 rho_minus(const point& r) const;
     vec3 rho_plus(const point& r) const;
