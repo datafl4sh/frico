@@ -90,13 +90,13 @@ basis_function::eval_plus(const point& r) const
 inline double
 basis_function::div_minus(const point& r) const
 {
-    return -length/(2.0*Aminus);
+    return -length/Aminus;
 }
 
 inline double
 basis_function::div_plus(const point& r) const
 {
-    return length/(2.0*Aplus);
+    return length/Aplus;
 }
 
 inline std::ostream&

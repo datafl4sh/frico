@@ -562,6 +562,7 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
     double omega = 2.0*M_PI*freq;
     double k = omega*std::sqrt(MU0*EPS0);
     std::complex<double> jomega{0.0, omega};
+    std::complex<double> jk{0.0, k};
 
     #pragma omp parallel for
     for (size_t i = 0; i < smpmsh.vertices.size(); i++) {
@@ -576,12 +577,17 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
             std::complex<double> g = (std::exp(-jkR)/(4*M_PI*R));
             frico::ezvec3 J = context.tri_AJ.row(itri);
             std::complex<double> divJ = context.tri_AdivJ(itri);
-            //locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
+            locE += -jomega*MU0*(J - divJ*(1.0+jkR)*(spt-bar).to_eigen()/(k*k*R*R))*g;
 
-            std::complex<double> G1 = (-1.0 - jkR + k*k*R*R)/(4*M_PI*R*R*R);
-            std::complex<double> G2 = (3.0 + 3.0*jkR - k*k*R*R)/(4*M_PI*R*R*R*R*R);
+            double r2 = R*R;
+            double r3 = r2*R;
+            double r4 = r3*R;
+            double r5 = r4*R;
+
+            std::complex<double> G1 = -1.0/(4*M_PI*r3) - jk/(4*M_PI*r2) + k*k/(4*M_PI*R);
+            std::complex<double> G2 = 3.0/(4*M_PI*r5) + 3.0*jk/(4*M_PI*r4) - k*k/(4*M_PI*r3);
             ezvec3 B = ((spt-bar).to_eigen().dot(J))*(spt-bar).to_eigen();
-            locE += (G1*J + B*G2)*std::exp(-jkR);
+            //locE += (G1*J + B*G2)*std::exp(-jkR);
 
             frico::ezvec3 RcrossJ = (spt - bar).to_eigen().cross(J)/R;
             std::complex<double> gradg = 
