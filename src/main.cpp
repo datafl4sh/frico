@@ -56,6 +56,7 @@ struct freq_context {
     zdfield                     tri_J;      // Tri-by-tri current density
     zdfield                     tri_AJ;     
     zdvector                    tri_AdivJ;
+    std::complex<double>        P;
 };
 
 enum class simulation_type {
@@ -448,21 +449,27 @@ bool run_context(simulation& sim, size_t ctx_number)
         context.tri_J.row(bf.itplus) += Jplus;
     }
 
-    std::complex<double> I = 0.0;
+    std::complex<double> totI = 0.0;
+    std::complex<double> totP = 0.0;
     for (const auto& ibf : sim.bfuncs) {
         if (not ibf.interface) {
             continue;
         }
 
         //if (ibf.interface.value() == 3)
-            I += ibf.length*context.I(ibf.matrix_index);
+            auto V = context.V(ibf.matrix_index);
+            auto I = ibf.length*context.I(ibf.matrix_index);
+            totP += 0.5*1.0*conj(I);
+            totI += I;
     }
-    auto z = 1./I;
+    auto z = 1./totI;
+
+    context.P = totP;
 
     std::complex<double> gamma = (z - 50.0)/(z + 50.0);
     double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
             
-    std::cout << z << " " << swr << std::endl;
+    std::cout << z << " " << swr << " " << totP << std::endl;
 
     return true;
 }
@@ -508,10 +515,13 @@ bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
     const point& center, double radius)
 {
     const mesh& msh = sim.msh;
+    const freq_context& context = sim.contexts[ctx_number];
 
-    frico::zdfield Exy = frico::zdfield::Zero(360, 3);
-    frico::zdfield Eyz = frico::zdfield::Zero(360, 3);
-    frico::zdfield Exz = frico::zdfield::Zero(360, 3);
+    frico::ddvector Gxy = frico::ddvector::Zero(360);
+    frico::ddvector Gyz = frico::ddvector::Zero(360);
+    frico::ddvector Gxz = frico::ddvector::Zero(360);
+
+    double maxG = -std::numeric_limits<double>::infinity();
 
     #pragma omp parallel for
     for (int deg = 0; deg < 360; deg++) {
@@ -523,43 +533,45 @@ bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
         /* XY */ {
             frico::point Pxy{ R*c, R*s, 0.0 };
             auto [locE, locH] = eval_fields(sim, ctx_number, Pxy);
-            Exy.row(deg) = locE;
+            ezvec3 S = 0.5*locE.cross(locH.conjugate());
+            double Prad = std::real(std::sqrt(S.dot(S)));
+            double G = 4*M_PI*R*R*Prad/std::real(context.P);
+            Gxy(deg) = G;
+            maxG = std::max(G, maxG);
         }
 
         /* YZ */ {
             frico::point Pyz{ 0.0, R*c, R*s };
             auto [locE, locH] = eval_fields(sim, ctx_number, Pyz);
-            Eyz.row(deg) = locE;
+            ezvec3 S = 0.5*locE.cross(locH.conjugate());
+            double Prad = std::real(std::sqrt(S.dot(S)));
+            double G = 4*M_PI*R*R*Prad/std::real(context.P);
+            Gyz(deg) = G;
+            maxG = std::max(G, maxG);
         }
 
         /* XZ */ {
             frico::point Pxz{ R*c, 0.0, -R*s };
             auto [locE, locH] = eval_fields(sim, ctx_number, Pxz);
-            Exz.row(deg) = locE;
+            ezvec3 S = 0.5*locE.cross(locH.conjugate());
+            double Prad = std::real(std::sqrt(S.dot(S)));
+            double G = 4*M_PI*R*R*Prad/std::real(context.P);
+            Gxz(deg) = G;
+            maxG = std::max(G, maxG);
         }
     }
 
-    double magExy_max = 0.0;
-    double magEyz_max = 0.0;
-    double magExz_max = 0.0;
-    for (int i = 0; i < 360; i++) {
-        { double magExy = std::sqrt(std::real(Exy.row(i).dot(Exy.row(i))));
-          magExy_max = std::max(magExy_max, magExy); }
-        { double magEyz = std::sqrt(std::real(Eyz.row(i).dot(Eyz.row(i))));
-          magEyz_max = std::max(magEyz_max, magEyz); }
-        { double magExz = std::sqrt(std::real(Exz.row(i).dot(Exz.row(i))));
-          magExz_max = std::max(magExz_max, magExz); }
-    }
+    std::cout << "Max gain: " << 10*std::log10(maxG) << " dB\n";
 
     std::string filename = "polar_" + std::to_string(ctx_number) + ".txt";
     std::ofstream ofs(filename);
     for (int i = 0; i < 360; i++) {
-        double magExy = std::sqrt(std::real(Exy.row(i).dot(Exy.row(i))));
-        double magEyz = std::sqrt(std::real(Eyz.row(i).dot(Eyz.row(i))));
-        double magExz = std::sqrt(std::real(Exz.row(i).dot(Exz.row(i))));
-        ofs << i << " " << magExy << " " << 20*std::log10(magExy/magExy_max)
-                 << " " << magEyz << " " << 20*std::log10(magEyz/magEyz_max)
-                 << " " << magExz << " " << 20*std::log10(magExz/magExz_max)
+        double magGxy = Gxy(i);
+        double magGyz = Gyz(i);
+        double magGxz = Gxz(i);
+        ofs << i << " " << magGxy << " " << 10*std::log10(magGxy)
+                 << " " << magGyz << " " << 10*std::log10(magGyz)
+                 << " " << magGxz << " " << 10*std::log10(magGxz)
                  << std::endl;
     }
 
