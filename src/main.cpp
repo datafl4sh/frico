@@ -551,7 +551,7 @@ bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
         }
 
         /* XZ */ {
-            frico::point Pxz{ R*c, 0.0, -R*s };
+            frico::point Pxz{ -R*c, 0.0, R*s };
             auto [locE, locH] = eval_fields(sim, ctx_number, Pxz);
             ezvec3 S = 0.5*locE.cross(locH.conjugate());
             double Prad = std::real(std::sqrt(S.dot(S)));
@@ -628,6 +628,7 @@ bool postpro_context(simulation& sim, size_t ctx_number)
 
 
     make_radiation_diagrams(sim, ctx_number, {0,0,0}, 5.0);
+
     
     return true;
 }

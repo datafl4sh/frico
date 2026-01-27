@@ -7,11 +7,17 @@ frico \- Friendly Radiation Integral COde
 [\fI\,OPTION\/\fR]... 
 .SH DESCRIPTION
 .PP
-A 3D Method of Moments code for the simulation of antennas and scattering structures.
+A 3D Method of Moments code for the simulation of antennas and scattering
+structures.
 .PP
 This code implements the Method of Moments (MoM) as described in "NASA
 Contractor Report 189594" titled "MOM3D Method of Moments Code - Theory
 Manual" by John F. Shaeffer.
+.PP
+The code takes as input a GMSH .geo file and some parameters specifying the
+sources and the simulation frequency. The output is written to text files (for
+impedance and radiation patterns) and SILO files for the visualization of fields
+using VisIt.
 .SH OPTIONS
 .TP
 \fB\-A\fR
@@ -28,12 +34,23 @@ exclusive with -R.
 \fB\-R <start>:<step>:<end>\fR
 Do a sweep from <start> Hz to <end> Hz at steps of <step> Hz. Frequencies may be
 specified using exponential notation. Mutually exclusive with -f.
-
+.TP
+\fB\-k <order>\fR
+Integration order to be used when not in approximate mode (-A). Default is 1.
+.TP
+\fB\-x <list of tags>\fR
+List of comma-separated tags corresponding to GMSH surfaces you want to exclude
+from loading. This exists only for convenience, the proper way to do this is
+to delete surfaces directly in the .geo file.
 .SH SEE ALSO
+.PP
 "NASA Contractor Report 189594" titled "MOM3D Method of Moments Code - Theory
 Manual" by John F. Shaeffer.
+.PP
+You should visit the Friuli Venezia Giulia region in Italy and taste "Frico",
+which is one of the main regional dishes.
 .SH BUGS
-List all known Bugs & where to report them
+Report bugs to <matteo.cicuttin@polito.it>
 .SH AUTHOR
 Written by Matteo `IV3IWE` Cicuttin
 .SH COPYRIGHT
