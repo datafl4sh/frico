@@ -1,0 +1,41 @@
+.\" This is a comment line, which wont appear in the man page.                                                                    
+.TH frico 1
+.SH NAME
+frico \- Friendly Radiation Integral COde
+.SH SYNOPSIS
+.B ls
+[\fI\,OPTION\/\fR]... 
+.SH DESCRIPTION
+.PP
+A 3D Method of Moments code for the simulation of antennas and scattering structures.
+.PP
+This code implements the Method of Moments (MoM) as described in "NASA
+Contractor Report 189594" titled "MOM3D Method of Moments Code - Theory
+Manual" by John F. Shaeffer.
+.SH OPTIONS
+.TP
+\fB\-A\fR
+Do not use quadratures, use approximate matrix as described in the MOM3D theory
+manual.
+.TP
+\fB\-g <path>\fR
+Path to the input geometry as .geo file obtained from GMSH.
+.TP
+\fB\-f <frequency>\fR
+Simulation frequency specified in Hz. Exponential notation may be used. Mutually
+exclusive with -R.
+.TP
+\fB\-R <start>:<step>:<end>\fR
+Do a sweep from <start> Hz to <end> Hz at steps of <step> Hz. Frequencies may be
+specified using exponential notation. Mutually exclusive with -f.
+
+.SH SEE ALSO
+"NASA Contractor Report 189594" titled "MOM3D Method of Moments Code - Theory
+Manual" by John F. Shaeffer.
+.SH BUGS
+List all known Bugs & where to report them
+.SH AUTHOR
+Written by Matteo `IV3IWE` Cicuttin
+.SH COPYRIGHT
+Copyright (C) 2025-2026 Matteo Cicuttin - Politecnico di Torino
+
