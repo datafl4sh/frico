@@ -24,6 +24,7 @@
 #include <vector>
 #include <string>
 #include <expected>
+#include <optional>
 
 namespace frico {
 
@@ -45,5 +46,8 @@ std::expected<frequency_range, parse_error>
 
 std::expected<std::vector<int>, parse_error>
     parse_integer_list(const std::string&);
+
+std::optional<frico::frequency_range>
+    parse_frequency_parameters(const char *, const char *);
 
 } // namespace frico

@@ -19,6 +19,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <iostream>
+#include <expected>
+#include <optional>
 #include "utils.h"
 
 namespace frico {
@@ -98,6 +101,55 @@ parse_integer_list(const std::string& str)
     }
 
     return ret;
+}
+
+std::optional<frico::frequency_range>
+parse_frequency_parameters(const char *arg_frequency, const char *arg_range_expr)
+{
+    if ( (arg_frequency == nullptr) and (arg_range_expr == nullptr) ) {
+        std::cerr << "Simulation frequency not specified (-f or -R)\n";
+        return {};
+    }
+
+    if ( (arg_frequency != nullptr) and (arg_range_expr != nullptr) ) {
+        std::cerr << "Flags -f and -R are mutually exclusive\n";
+        return {};
+    }
+
+    if ( arg_frequency ) {
+        try {
+            double frequency = std::stod(arg_frequency);
+            return frico::frequency_range {
+                .start = frequency,
+                .step = frequency,
+                .end = frequency
+            };
+        }
+        catch (...) {
+            std::cerr << "Error parsing the argument of -f\n";
+            return {};
+        }
+    }
+
+    if ( arg_range_expr ) {
+        auto exp_range = frico::parse_frequency_range(arg_range_expr);
+        if ( exp_range.has_value() ) {
+            return *exp_range;
+        }
+        
+        switch ( exp_range.error() ) {
+            case frico::parse_error::invalid_input:
+                std::cerr << "Malformed range expression for -R\n";
+                return {};
+            case frico::parse_error::out_of_range:
+                std::cerr << "Invalid range for -R\n";
+                return {};
+            default:
+                return {};
+        }
+    }
+
+    return {};
 }
 
 } // namespace frico

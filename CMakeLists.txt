@@ -96,7 +96,7 @@ endif()
 
 set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
             src/output_silo.cpp src/quadratures.cpp src/rwg_basis.cpp
-            src/utils.cpp src/sources.cpp
+            src/utils.cpp src/sources.cpp src/bem_maxwell.cpp
 )
 
 add_executable(frico ${SOURCES})
