@@ -92,9 +92,10 @@ int main(int argc, char **argv)
     const char *arg_skiptags = nullptr;
     const char *arg_frequency = nullptr;
     const char *arg_range_expr = nullptr;
+    const char *arg_simname = "default";
 
     int opt;
-    while ((opt = getopt(argc, argv, "Af:g:k:s:SR:x:")) != -1) {
+    while ((opt = getopt(argc, argv, "Af:g:k:n:s:SR:x:")) != -1) {
         switch (opt) {
         case 'A':
             sim.cfg.approx_matrix = true;
@@ -107,6 +108,9 @@ int main(int argc, char **argv)
             break;
         case 'k':
             sim.cfg.degree = std::stoull(optarg);
+            break;
+        case 'n':
+            arg_simname = optarg;
             break;
         case 's':
             //sim.cfg.silo_path = optarg;
@@ -151,7 +155,7 @@ int main(int argc, char **argv)
     }
 
 
-    if ( not frico::maxwell::init_simulation(sim, "default", arg_geo_path) ) {
+    if ( not frico::maxwell::init_simulation(sim, arg_simname, arg_geo_path) ) {
         return EXIT_FAILURE;
     }
 
