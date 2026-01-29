@@ -224,8 +224,10 @@ compute_rhs(simulation& sim, size_t ctx_number)
             continue;
         }
 
-        std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
-        context.V(ibf.matrix_index) = entry;
+        //if (ibf.interface.value() == 3) {
+            std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
+            context.V(ibf.matrix_index) = entry;
+        //}
     }
 }
 
@@ -365,6 +367,33 @@ bool run_context(simulation& sim, size_t ctx_number)
     return true;
 }
 
+bool make_sampling_sphere(mesh& msh, const point& center,
+    double r, double h)
+{
+    gmsh::initialize();
+    gmsh::option::setNumber("General.Verbosity", 1);
+
+    gmsh::model::add("sampling");
+
+    gmsh::model::occ::addSphere(center.x(), center.y(), center.z(), r);
+
+    gmsh::model::occ::synchronize();
+
+    gmsh::vectorpair vp;
+    gmsh::model::getEntities(vp);
+    gmsh::model::mesh::setSize(vp, h);
+    gmsh::model::mesh::generate(2);
+    gmsh::model::mesh::setOrder(1);
+
+    if ( not load_from_gmsh(msh, load_mode::quick) ) {
+        return false;
+    }
+
+    gmsh::clear();
+    gmsh::finalize();
+    return true;
+}
+
 bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
     double r, double h)
 {
@@ -394,7 +423,9 @@ bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
     gmsh::model::mesh::generate(2);
     //gmsh::model::mesh::setOrder(1);
 
-    load_from_gmsh(msh, frico::load_mode::quick);
+    if ( not load_from_gmsh(msh, load_mode::quick) ) {
+        return false;
+    }
 
     gmsh::clear();
     gmsh::finalize();
@@ -437,6 +468,29 @@ eval_fields(const simulation& sim, size_t ctx_number, const point& pt)
     }
 
     return {E,H};
+}
+
+bool
+make_radiation_diagrams(const simulation& sim, size_t ctx_number,
+    const mesh& smpmsh, ddvector& gain)
+{
+    const mesh& msh = sim.msh;
+    const freq_context& context = sim.contexts[ctx_number];
+
+    gain = ddvector::Zero(smpmsh.vertices.size());
+
+    #pragma omp parallel for
+    for (size_t i = 0; i < smpmsh.vertices.size(); i++) {
+        const auto& p = smpmsh.vertices[i];
+        auto [locE, locH] = eval_fields(sim, ctx_number, p);
+        auto R = norm(p);
+        ezvec3 S = 0.5*locE.cross(locH.conjugate());
+        double Prad = std::real(std::sqrt(S.dot(S)));
+        double G = 4*M_PI*R*R*Prad/std::real(context.P);
+        gain(i) = G;
+    }
+
+    return true;
 }
 
 bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
@@ -552,10 +606,18 @@ bool postpro_context(simulation& sim, size_t ctx_number)
     db.add_variable("sampling", "H", H, var_centering::nodal);
     db.add_variable("sampling", "Z", Z, var_centering::nodal);
 
+    mesh smpsph;
+    make_sampling_sphere(smpsph, {0.0, 0.0, 0.0}, 5, 0.5);
+    ddvector gain;
+    make_radiation_diagrams(sim, ctx_number, smpsph, gain);
+    db.add_mesh("gainsmp", smpsph);
+    db.add_variable("gainsmp", "gain", gain, var_centering::nodal);
+
     db.close();
 
 
     make_radiation_diagrams(sim, ctx_number, {0,0,0}, 5.0);
+
 
     
     return true;

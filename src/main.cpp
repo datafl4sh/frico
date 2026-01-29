@@ -43,29 +43,7 @@
 
 
 
-bool make_sampling_sphere(frico::mesh& msh, const frico::point& center, double r, double h)
-{
-    gmsh::initialize();
-    gmsh::option::setNumber("General.Verbosity", 1);
 
-    gmsh::model::add("sampling");
-
-    gmsh::model::occ::addSphere(center.x(), center.y(), center.z(), r);
-
-    gmsh::model::occ::synchronize();
-
-    gmsh::vectorpair vp;
-    gmsh::model::getEntities(vp);
-    gmsh::model::mesh::setSize(vp, h);
-    gmsh::model::mesh::generate(2);
-    gmsh::model::mesh::setOrder(1);
-
-    frico::load_from_gmsh(msh, frico::load_mode::quick);
-
-    gmsh::clear();
-    gmsh::finalize();
-    return true;
-}
 
 
 

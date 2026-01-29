@@ -38,10 +38,28 @@ specified using exponential notation. Mutually exclusive with -f.
 \fB\-k <order>\fR
 Integration order to be used when not in approximate mode (-A). Default is 1.
 .TP
+\fB\-n <name>\fR
+Set a descriptive name for the simulation. Default is "default".
+.TP
 \fB\-x <list of tags>\fR
 List of comma-separated tags corresponding to GMSH surfaces you want to exclude
-from loading. This exists only for convenience, the proper way to do this is
-to delete surfaces directly in the .geo file.
+from loading. This is useful when in your mesh you have edges with more than
+two triangles attached, but the option exists only for convenience. The proper
+way to do this is to delete surfaces directly in the .geo file, for example:
+
+.in +4n
+.EX
+SetFactory("OpenCASCADE");
+Cylinder(1) = {0, 0, 0, 1, 0, 0, 0.01, 2*Pi};
+Cylinder(2) = {-1, 0, 0, 1, 0, 0, 0.01, 2*Pi};
+Coherence;
+MeshSize{ PointsOf{ Surface{:}; } } = 0.01;
+Mesh 2;
+Delete { Volume{1,2}; }
+Delete { Surface{3}; }
+.EE
+.in
+
 .SH SEE ALSO
 .PP
 "NASA Contractor Report 189594" titled "MOM3D Method of Moments Code - Theory
