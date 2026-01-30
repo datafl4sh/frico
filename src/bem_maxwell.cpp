@@ -350,7 +350,7 @@ bool run_context(simulation& sim, size_t ctx_number)
         }
 
         //if (ibf.interface.value() == 3)
-            auto V = context.V(ibf.matrix_index);
+            //auto V = context.V(ibf.matrix_index);
             auto I = ibf.length*context.I(ibf.matrix_index);
             totP += 0.5*1.0*conj(I);
             totI += I;
@@ -453,7 +453,7 @@ eval_fields(const simulation& sim, size_t ctx_number, const point& pt)
         const edvec3 vR = (pt - bar).to_eigen();
         const double R = norm(pt - bar);
         const double _4piR = 4*M_PI*R;
-        const double _4piR3 = 4*M_PI*R*R*R;
+        const double _4piR3 = _4piR*R*R;
 
         std::complex<double> jkR{0, k*R};
         std::complex<double> g = (std::exp(-jkR)/_4piR);
@@ -474,7 +474,6 @@ bool
 make_radiation_diagrams(const simulation& sim, size_t ctx_number,
     const mesh& smpmsh, ddvector& gain)
 {
-    const mesh& msh = sim.msh;
     const freq_context& context = sim.contexts[ctx_number];
 
     gain = ddvector::Zero(smpmsh.vertices.size());
@@ -496,7 +495,6 @@ make_radiation_diagrams(const simulation& sim, size_t ctx_number,
 bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
     const point& center, double radius)
 {
-    const mesh& msh = sim.msh;
     const freq_context& context = sim.contexts[ctx_number];
 
     ddvector Gxy = ddvector::Zero(360);

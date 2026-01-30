@@ -8,9 +8,14 @@ set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-#set (CMAKE_CXX_FLAGS "-g -fsanitize=address")
-#set (CMAKE_CXX_FLAGS "-g")
-#set (CMAKE_CXX_FLAGS "-Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS_DEBUGSANITIZED "-g -fsanitize=address")
+
+option(OPT_VECTORIZER_REPORT "Show vectorizer reports" OFF)
+if (OPT_VECTORIZER_REPORT)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Rpass=loop-vectorize \
+        -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize")
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
