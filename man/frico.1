@@ -24,6 +24,9 @@ using VisIt.
 Do not use quadratures, use approximate matrix as described in the MOM3D theory
 manual.
 .TP
+\fB\-d\fR
+Dump matrices and right hand sides of all the linear systems.
+.TP
 \fB\-g <path>\fR
 Path to the input geometry as .geo file obtained from GMSH.
 .TP
@@ -40,6 +43,11 @@ Integration order to be used when not in approximate mode (-A). Default is 1.
 .TP
 \fB\-n <name>\fR
 Set a descriptive name for the simulation. Default is "default".
+.TP
+\fB\-S\fR
+Expert stuff: In the current implementation the matrix is slightly nonsymmetric
+(only for non-approximate variant) because of the handling of the self elements.
+This flag forces symmetrization by doing 0.5*(Z + Z^T). Don't use.
 .TP
 \fB\-x <list of tags>\fR
 List of comma-separated tags corresponding to GMSH surfaces you want to exclude

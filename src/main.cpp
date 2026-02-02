@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 
     #ifndef _OPENMP
     std::print(
-"FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026\n\n";
+"FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026\n\n"
     );
     #else
     std::print(
@@ -74,10 +74,13 @@ int main(int argc, char **argv)
     const char *arg_simname = "default";
 
     int opt;
-    while ((opt = getopt(argc, argv, "Af:g:k:n:s:SR:x:")) != -1) {
+    while ((opt = getopt(argc, argv, "Adf:g:k:n:s:SR:x:")) != -1) {
         switch (opt) {
         case 'A':
             sim.cfg.approx_matrix = true;
+            break;
+        case 'd':
+            sim.cfg.dump_matrices = true;
             break;
         case 'f':
             arg_frequency = optarg;

@@ -33,6 +33,7 @@ struct config
     size_t          degree = 1;
     bool            approx_matrix = false;
     bool            force_symmetry = false;
+    bool            dump_matrices = false;
 };
 struct freq_context {
     size_t                      ctx_number; // Incremental context number

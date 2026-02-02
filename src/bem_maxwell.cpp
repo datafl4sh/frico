@@ -23,6 +23,9 @@
 #include <fstream>
 #include <chrono>
 
+#include "eigen.h"
+#include <highfive/H5Easy.hpp>
+
 #include "bem_maxwell.h"
 #include "input_gmsh.h"
 #include "quadratures.h"
@@ -309,10 +312,10 @@ bool run_context(simulation& sim, size_t ctx_number)
     
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
-    std::println("{} seconds\n", asm_elapsed_seconds);
+    std::println("{} seconds", asm_elapsed_seconds);
 
     if (sim.cfg.force_symmetry) {
-        context.Z = (context.Z+context.Z.transpose())/2.0;
+        context.Z = ((context.Z+context.Z.transpose())/2.0).eval();
     }
 
     std::print("  Solving linear system..."); std::fflush(stdout);
@@ -320,7 +323,7 @@ bool run_context(simulation& sim, size_t ctx_number)
     context.I = context.Z.lu().solve(context.V);
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
-    std::println("{} seconds\n", elapsed_seconds);
+    std::println("{} seconds", elapsed_seconds);
 
     context.tri_AJ = zdfield::Zero(sim.msh.triangles.size(), 3);
     context.tri_AdivJ = zdvector::Zero(sim.msh.triangles.size());
@@ -640,10 +643,17 @@ bool run(simulation& sim)
         run_context(sim, ctx_num);
         postpro_context(sim, ctx_num);
 
+        const auto& ctx = sim.contexts[ctx_num];
+        if (sim.cfg.dump_matrices) {
+            std::string h5fn = "frico_" + std::to_string(ctx_num) + ".h5";
+            H5Easy::File file(h5fn, H5Easy::File::Truncate);
+            file.createDataSet("/frico/Z", ctx.Z);
+            file.createDataSet("/frico/V", ctx.V);
+        }
+
         /* dealloc matrix when we're done */
         sim.contexts[ctx_num].Z.resize(0,0);
 
-        const auto& ctx = sim.contexts[ctx_num];
         ofs << ctx.fp_Z.real() << " " << ctx.fp_Z.imag() << " ";
         ofs << ctx.gain << std::endl << std::flush;
     }
