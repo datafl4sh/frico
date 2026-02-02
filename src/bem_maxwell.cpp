@@ -291,14 +291,13 @@ bool run_context(simulation& sim, size_t ctx_number)
 {
     freq_context& context = sim.contexts[ctx_number];
 
-    std::cout << "Sweep frequency " << ctx_number << ": ";
-    std::cout << context.frequency << " Hz" << std::endl; 
+    std::println("Sweep step {}: {} Hz", ctx_number, context.frequency); 
 
     auto system_size = num_internal_edges(sim.msh);
     context.Z = zdmatrix::Zero(system_size, system_size);
     context.V = zdvector::Zero(system_size);
 
-    std::cout << "  Assemblying linear system..." << std::flush;
+    std::print("  Assemblying linear system..."); std::fflush(stdout);
     const auto asm_start{std::chrono::steady_clock::now()};
     if (sim.cfg.approx_matrix) {
         compute_matrix_approx(sim, ctx_number);
@@ -310,17 +309,18 @@ bool run_context(simulation& sim, size_t ctx_number)
     
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
-    std::cout << asm_elapsed_seconds << " seconds\n";
+    std::println("{} seconds\n", asm_elapsed_seconds);
+
     if (sim.cfg.force_symmetry) {
         context.Z = (context.Z+context.Z.transpose())/2.0;
     }
 
-    std::cout << "  Solving linear system..." << std::flush;
+    std::print("  Solving linear system..."); std::fflush(stdout);
     const auto start{std::chrono::steady_clock::now()};
     context.I = context.Z.lu().solve(context.V);
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
-    std::cout << elapsed_seconds << " seconds\n";
+    std::println("{} seconds\n", elapsed_seconds);
 
     context.tri_AJ = zdfield::Zero(sim.msh.triangles.size(), 3);
     context.tri_AdivJ = zdvector::Zero(sim.msh.triangles.size());
@@ -551,7 +551,7 @@ bool make_radiation_diagrams(simulation& sim, size_t ctx_number,
         }
     }
 
-    std::cout << "Max gain: " << 10*std::log10(maxG) << " dB\n";
+    std::println("Max gain: {} dB", 10*std::log10(maxG));
     context.gain = 10*std::log10(maxG);
 
     std::string filename = "polar_" + std::to_string(ctx_number) + ".txt";

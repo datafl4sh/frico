@@ -19,7 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
+#include <print>
 #include <cmath>
 #include <fstream>
 #include <chrono>
@@ -56,12 +56,13 @@ int main(int argc, char **argv)
     //_MM_SET_EXCEPTION_MASK(_MM_GET_EXCEPTION_MASK() & ~_MM_MASK_INVALID);
 
     #ifndef _OPENMP
-    std::cout <<
-        "FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026\n\n";
+    std::print(
+"FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026\n\n";
+    );
     #else
-    std::cout <<
-        "FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026 ";
-    std::cout << "[OpenMP]\n\n";
+    std::print(
+"FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026 [OpenMP]\n\n"
+    );
     #endif
 
     frico::maxwell::simulation sim;
@@ -104,14 +105,14 @@ int main(int argc, char **argv)
             break;
 
         default:
-            std::cerr << "Invalid argument\n";
+            std::println(stderr, "Invalid argument");
             return EXIT_FAILURE;
         }
     }
 
     /* (1) Check if geometry was specified */
     if (arg_geo_path == nullptr) {
-        std::cerr << "No geometry specified (-g)\n";
+        std::println(stderr, "No geometry specified (-g)");
         return EXIT_FAILURE;
     }
 
@@ -127,7 +128,7 @@ int main(int argc, char **argv)
         if (exp_skiptags.has_value()) {
             sim.skiptags = *exp_skiptags;
         } else {
-            std::cerr << "Error parsing the argument of -x\n";
+            std::println(stderr, "Error parsing the argument of -x");
             return EXIT_FAILURE;
         }
     }

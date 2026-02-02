@@ -35,7 +35,6 @@ struct meshing_error_info
 {
     meshing_error   errtype;
 
-    /* for bad_connectivity */
     int             tminus_tag;
     int             tplus_tag;
     int             offending_tag;
