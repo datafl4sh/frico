@@ -176,6 +176,9 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
                 edge e{node0_ofs, node1_ofs};
 
                 auto opt_ofs = offset(msh.edges, e);
+                if (not opt_ofs) {
+                    std::cout << "Edge not found: " << e << " " << tag << std::endl;
+                }
                 assert(opt_ofs);
                 bedgeptr bep;
                 bep.offset = *opt_ofs;

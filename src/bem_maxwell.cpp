@@ -224,10 +224,11 @@ compute_rhs(simulation& sim, size_t ctx_number)
             continue;
         }
 
-        //if (ibf.interface.value() == 3) {
+        auto s = ibf.interface.value();
+        if (s == 4 or s == 5 or s == 6 or s == 7) {
             std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
             context.V(ibf.matrix_index) = entry;
-        //}
+        }
     }
 }
 
