@@ -244,13 +244,20 @@ bool init_simulation(simulation& sim, const std::string& name,
             std::cerr << "Can't load geometry, exiting" << std::endl;
             return false;
         }
-        if (err.errtype == frico::meshing_error::bad_connectivity) {
+        if (err.errtype == frico::meshing_error::multiple_triangles) {
             std::cerr <<
-                "The mesh connectivity is not valid because an edge shared by\n"
-                "more than two triangles was detected. This does not permit\n"
-                "to construct the RWG basis.\n"
-                "The tags of the involved surfaces are " << err.tminus_tag
-                << ", " << err.tplus_tag << " and " << err.offending_tag << ".\n";
+"The mesh connectivity is not valid because an edge shared by more than two\n"
+"triangles was detected. This does not permit to construct the RWG basis.\n"
+"The tags of the involved surfaces are " << err.tminus_tag
+            << ", " << err.tplus_tag << " and " << err.offending_tag << ".\n";
+            return false;
+        }
+
+        if (err.errtype == frico::meshing_error::lonely_edge) {
+            std::cerr <<
+"Looks like that an edge from Curve " << err.offending_tag << " is not on the "
+"boundary of any surface.\nProbably you need to delete Curve " << err.offending_tag
+<< " from your GMSH geometry.\n";
             return false;
         }
     }

@@ -138,7 +138,7 @@ gmsh_get_triangles(mesh& msh, const std::vector<std::optional<size_t>>& node_tag
     );
 }
 
-static void
+static merr_t
 gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& node_tag2ofs)
 {
     gmsh::vectorpair entities;
@@ -177,9 +177,12 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
 
                 auto opt_ofs = offset(msh.edges, e);
                 if (not opt_ofs) {
-                    std::cout << "Edge not found: " << e << " " << tag << std::endl;
+                    meshing_error_info mei;
+                    mei.errtype = meshing_error::lonely_edge;
+                    mei.offending_tag = tag;
+                    return std::unexpected(mei);
                 }
-                assert(opt_ofs);
+
                 bedgeptr bep;
                 bep.offset = *opt_ofs;
                 bep.tag = tag;
@@ -187,6 +190,8 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
             }
         }
     }
+
+    return true;
 }
 
 static std::expected<bool, meshing_error_info>
@@ -209,7 +214,7 @@ compute_connectivity(mesh& msh)
             auto& en = msh.edge_neighbours[ofs];
             if (en.itplus) {
                 meshing_error_info mei;
-                mei.errtype = meshing_error::bad_connectivity;
+                mei.errtype = meshing_error::multiple_triangles;
                 mei.tminus_tag = msh.triangles[en.itminus].tag;
                 mei.tplus_tag = msh.triangles[*en.itplus].tag;
                 mei.offending_tag = msh.triangles[itri].tag;
@@ -303,7 +308,10 @@ load_from_gmsh(mesh& msh, const load_mode mode, const std::vector<int>& skiptags
     std::vector<std::optional<size_t>> node_tag2ofs;
     gmsh_get_vertices(msh, node_tag2ofs);
     gmsh_get_triangles(msh, node_tag2ofs, skiptags);
-    gmsh_get_boundary_edges(msh, node_tag2ofs);
+    auto gbe_ok = gmsh_get_boundary_edges(msh, node_tag2ofs);
+    if (not gbe_ok) {
+        return gbe_ok;
+    }
 
     size_t max_index = 0;
     for (auto& t : msh.triangles) {

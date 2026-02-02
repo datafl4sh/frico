@@ -28,7 +28,8 @@ namespace frico {
 
 enum class meshing_error {
     gmsh_issue,
-    bad_connectivity,
+    lonely_edge,
+    multiple_triangles,
 };
 struct meshing_error_info
 {
