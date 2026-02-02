@@ -365,7 +365,8 @@ bool run_context(simulation& sim, size_t ctx_number)
     }
     auto z = 1./totI;
 
-    context.P = totP;
+    context.fp_P = totP;
+    context.fp_Z = z;
 
     std::complex<double> gamma = (z - 50.0)/(z + 50.0);
     double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
@@ -493,17 +494,17 @@ make_radiation_diagrams(const simulation& sim, size_t ctx_number,
         auto R = norm(p);
         ezvec3 S = 0.5*locE.cross(locH.conjugate());
         double Prad = std::real(std::sqrt(S.dot(S)));
-        double G = 4*M_PI*R*R*Prad/std::real(context.P);
+        double G = 4*M_PI*R*R*Prad/std::real(context.fp_P);
         gain(i) = G;
     }
 
     return true;
 }
 
-bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
+bool make_radiation_diagrams(simulation& sim, size_t ctx_number,
     const point& center, double radius)
 {
-    const freq_context& context = sim.contexts[ctx_number];
+    freq_context& context = sim.contexts[ctx_number];
 
     ddvector Gxy = ddvector::Zero(360);
     ddvector Gyz = ddvector::Zero(360);
@@ -523,7 +524,7 @@ bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
             auto [locE, locH] = eval_fields(sim, ctx_number, Pxy);
             ezvec3 S = 0.5*locE.cross(locH.conjugate());
             double Prad = std::real(std::sqrt(S.dot(S)));
-            double G = 4*M_PI*R*R*Prad/std::real(context.P);
+            double G = 4*M_PI*R*R*Prad/std::real(context.fp_P);
             Gxy(deg) = G;
             maxG = std::max(G, maxG);
         }
@@ -533,7 +534,7 @@ bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
             auto [locE, locH] = eval_fields(sim, ctx_number, Pyz);
             ezvec3 S = 0.5*locE.cross(locH.conjugate());
             double Prad = std::real(std::sqrt(S.dot(S)));
-            double G = 4*M_PI*R*R*Prad/std::real(context.P);
+            double G = 4*M_PI*R*R*Prad/std::real(context.fp_P);
             Gyz(deg) = G;
             maxG = std::max(G, maxG);
         }
@@ -543,13 +544,14 @@ bool make_radiation_diagrams(const simulation& sim, size_t ctx_number,
             auto [locE, locH] = eval_fields(sim, ctx_number, Pxz);
             ezvec3 S = 0.5*locE.cross(locH.conjugate());
             double Prad = std::real(std::sqrt(S.dot(S)));
-            double G = 4*M_PI*R*R*Prad/std::real(context.P);
+            double G = 4*M_PI*R*R*Prad/std::real(context.fp_P);
             Gxz(deg) = G;
             maxG = std::max(G, maxG);
         }
     }
 
     std::cout << "Max gain: " << 10*std::log10(maxG) << " dB\n";
+    context.gain = 10*std::log10(maxG);
 
     std::string filename = "polar_" + std::to_string(ctx_number) + ".txt";
     std::ofstream ofs(filename);
@@ -631,12 +633,18 @@ bool postpro_context(simulation& sim, size_t ctx_number)
 
 bool run(simulation& sim)
 {
+    std::ofstream ofs("outparams.txt");
+    ofs << "Re(Z)  Im(Z)  MaxGain" << std::endl;
     for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
         run_context(sim, ctx_num);
         postpro_context(sim, ctx_num);
 
         /* dealloc matrix when we're done */
         sim.contexts[ctx_num].Z.resize(0,0);
+
+        const auto& ctx = sim.contexts[ctx_num];
+        ofs << ctx.fp_Z.real() << " " << ctx.fp_Z.imag() << " ";
+        ofs << ctx.gain << std::endl << std::flush;
     }
     return true;
 }
