@@ -19,6 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <print>
 #include <fstream>
 #include <chrono>
 
@@ -245,28 +246,28 @@ bool init_simulation(simulation& sim, const std::string& name,
             return false;
         }
         if (err.errtype == frico::meshing_error::multiple_triangles) {
-            std::cerr <<
+            std::print(stderr,
 "The mesh connectivity is not valid because an edge shared by more than two\n"
 "triangles was detected. This does not permit to construct the RWG basis.\n"
-"The tags of the involved surfaces are " << err.tminus_tag
-            << ", " << err.tplus_tag << " and " << err.offending_tag << ".\n";
+"The tags of the involved surfaces are {}, {} and {}.\n", err.tminus_tag,
+    err.tplus_tag, err.offending_tag);
             return false;
         }
 
         if (err.errtype == frico::meshing_error::lonely_edge) {
-            std::cerr <<
-"Looks like that an edge from Curve " << err.offending_tag << " is not on the "
-"boundary of any surface.\nProbably you need to delete Curve " << err.offending_tag
-<< " from your GMSH geometry.\n";
+            std::print(stderr,
+"Looks like that an edge from Curve {} is not on the boundary of any surface.\n"
+"Probably you need to delete Curve {} from your GMSH geometry.\n",
+    err.offending_tag, err.offending_tag);
             return false;
         }
     }
 
-    std::cout << "Mesh information: " << std::endl;
-    std::cout << "        Vertices: " << sim.msh.vertices.size() << std::endl;
-    std::cout << "           Edges: " << sim.msh.edges.size() << std::endl;
-    std::cout << "           Cells: " << sim.msh.triangles.size() << std::endl;
-    std::cout << "  Internal edges: " << num_internal_edges(sim.msh) << "\n";
+    std::println("Mesh information: ");
+    std::println("        Vertices: {}", sim.msh.vertices.size());
+    std::println("           Edges: {}", sim.msh.edges.size());
+    std::println("           Cells: {}", sim.msh.triangles.size());
+    std::println("  Internal edges: {}", num_internal_edges(sim.msh));
 
     make_function_space(sim.msh, sim.bfuncs);
 
