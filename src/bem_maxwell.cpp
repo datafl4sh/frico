@@ -215,7 +215,7 @@ compute_matrix_approx(simulation& sim, size_t ctx_number)
 }
 
 void
-compute_rhs(simulation& sim, size_t ctx_number)
+compute_rhs(simulation& sim, size_t ctx_number, const excitation *ex)
 {
     auto& context = sim.contexts[ctx_number];
 
@@ -224,15 +224,19 @@ compute_rhs(simulation& sim, size_t ctx_number)
 
     for (const auto& ibf : sim.bfuncs) {
     
+        /*
         if (not ibf.interface) {
             continue;
         }
 
         auto s = ibf.interface.value();
-        if (s == 4 or s == 5 or s == 6 or s == 7) {
+        if (s == 170) {
             std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
             context.V(ibf.matrix_index) = entry;
         }
+        */
+
+        context.V(ibf.matrix_index) = ex->compute(sim.msh, ibf);
     }
 }
 
@@ -308,7 +312,10 @@ bool run_context(simulation& sim, size_t ctx_number)
         compute_matrix(sim, ctx_number);
     }
     
-    compute_rhs(sim, ctx_number);
+    //delta_gap src({4,5,6,7}, 1.0, 2*M_PI*context.frequency);
+    delta_gap src({170}, 1.0, 2*M_PI*context.frequency);
+
+    compute_rhs(sim, ctx_number, &src);
     
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};

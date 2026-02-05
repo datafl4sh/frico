@@ -56,11 +56,17 @@ plane_wave::compute(const mesh& msh, const basis_function& bf) const
 std::complex<double>
 delta_gap::compute(const mesh& msh, const basis_function& bf) const
 {
-    if ( (not bf.interface) or (*bf.interface != interface_) ) {
+    if (not bf.interface) {
         return 0.0;
     }
 
-    return voltage_ * std::complex<double>{0.0, -bf.length/(omega_*MU0)};
+    for (auto& interface : interfaces_) {
+        if (*bf.interface == interface) {
+            return voltage_ * std::complex<double>{0.0, -bf.length/(omega_*MU0)};
+        }
+    }
+
+    return 0.0;
 }
 
 } // namespace frico
