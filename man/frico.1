@@ -34,6 +34,20 @@ Path to the input geometry as .geo file obtained from GMSH.
 Simulation frequency specified in Hz. Exponential notation may be used. Mutually
 exclusive with -R.
 .TP
+\fB\-s <physgroup>\fR
+Currently only antenna simulation is supported, therefore only delta-gap sources
+are allowed. Delta-gap voltage is applied to one or more curves that need to be
+grouped in a physical group of your GMSH model. For example, if a delta-gap
+source on curves 4,5,6 and 7 is wanted, you need to put in your GMSH model
+something like
+
+.in +4n
+.EX
+Physical Curve("source", 10) = {4,5,6,7};
+.EE
+.in
+
+.TP
 \fB\-R <start>:<step>:<end>\fR
 Do a sweep from <start> Hz to <end> Hz at steps of <step> Hz. Frequencies may be
 specified using exponential notation. Mutually exclusive with -f.
@@ -78,7 +92,7 @@ which is one of the main regional dishes.
 .SH BUGS
 Report bugs to <matteo.cicuttin@polito.it>
 .SH AUTHOR
-Written by Matteo `IV3IWE` Cicuttin
+Written by IV3IWE Matteo Cicuttin
 .SH COPYRIGHT
 Copyright (C) 2025-2026 Matteo Cicuttin - Politecnico di Torino
 

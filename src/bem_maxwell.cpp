@@ -236,7 +236,8 @@ compute_rhs(simulation& sim, size_t ctx_number, const excitation *ex)
         }
         */
 
-        context.V(ibf.matrix_index) = ex->compute(sim.msh, ibf);
+        std::complex<double> v {0.0, -1.0/(omega*MU0) };
+        context.V(ibf.matrix_index) = v*ex->compute(sim.msh, ibf);
     }
 }
 
@@ -313,9 +314,11 @@ bool run_context(simulation& sim, size_t ctx_number)
     }
     
     //delta_gap src({4,5,6,7}, 1.0, 2*M_PI*context.frequency);
-    delta_gap src({170}, 1.0, 2*M_PI*context.frequency);
+    //delta_gap src({170}, 1.0);
 
-    compute_rhs(sim, ctx_number, &src);
+    if (sim.excit) {
+        compute_rhs(sim, ctx_number, sim.excit.get());
+    }
     
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};

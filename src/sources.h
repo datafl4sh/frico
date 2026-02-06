@@ -54,11 +54,10 @@ public:
 class delta_gap : public excitation {
     std::vector<int>        interfaces_;
     std::complex<double>    voltage_;
-    double                  omega_;
 
 public:
-    delta_gap(std::vector<int> interfaces, std::complex<double> voltage, double omega)
-        : interfaces_(interfaces), voltage_(voltage), omega_(omega)
+    delta_gap(std::vector<int> interfaces, std::complex<double> voltage)
+        : interfaces_(interfaces), voltage_(voltage)
     {}
 
     std::complex<double>

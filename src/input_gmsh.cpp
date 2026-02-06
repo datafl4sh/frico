@@ -24,6 +24,8 @@
 #include <optional>
 #include <cassert>
 #include <expected>
+#include <print>
+#include <format>
 
 #include "geom_mesh.h"
 #include "input_gmsh.h"
@@ -192,6 +194,22 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
     }
 
     return true;
+}
+
+static void
+gmsh_get_physical_groups(mesh& msh)
+{
+    gmsh::vectorpair pgroups;
+    gmsh::model::getPhysicalGroups(pgroups);
+    for (const auto& [dim, tag] : pgroups) {
+        std::string pgname;
+        gmsh::model::getPhysicalName(dim, tag, pgname);
+        physgroup pg;
+        pg.dim = dim;
+        pg.tag = tag;
+        gmsh::model::getEntitiesForPhysicalGroup(dim, tag, pg.entityTags);
+        msh.physgroups[pgname] = std::move(pg);
+    }
 }
 
 static std::expected<bool, meshing_error_info>
@@ -363,6 +381,8 @@ load_from_gmsh(mesh& msh, const load_mode mode, const std::vector<int>& skiptags
         if (not ccret) {
             return ccret;
         }
+
+        gmsh_get_physical_groups(msh);
     }
 
     return true;

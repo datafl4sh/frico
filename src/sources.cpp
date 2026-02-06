@@ -62,7 +62,7 @@ delta_gap::compute(const mesh& msh, const basis_function& bf) const
 
     for (auto& interface : interfaces_) {
         if (*bf.interface == interface) {
-            return voltage_ * std::complex<double>{0.0, -bf.length/(omega_*MU0)};
+            return voltage_ * bf.length;
         }
     }
 

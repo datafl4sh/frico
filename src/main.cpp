@@ -57,16 +57,17 @@ int main(int argc, char **argv)
 
     #ifndef _OPENMP
     std::print(
-"FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026\n\n"
+"FRICO v0.0 3D MoM solver - IV3IWE Matteo Cicuttin (C) 2025-2026\n\n"
     );
     #else
     std::print(
-"FRICO v0.0 3D MoM solver - Matteo `IV3IWE` Cicuttin (C) 2025-2026 [OpenMP]\n\n"
+"FRICO v0.0 3D MoM solver - IV3IWE Matteo Cicuttin (C) 2025-2026 [OpenMP]\n\n"
     );
     #endif
 
     frico::maxwell::simulation sim;
 
+    const char *arg_source = nullptr;
     const char *arg_geo_path = nullptr;
     const char *arg_skiptags = nullptr;
     const char *arg_frequency = nullptr;
@@ -95,7 +96,7 @@ int main(int argc, char **argv)
             arg_simname = optarg;
             break;
         case 's':
-            //sim.cfg.silo_path = optarg;
+            arg_source = optarg;
             break;
         case 'S':
             sim.cfg.force_symmetry = true;
@@ -136,8 +137,24 @@ int main(int argc, char **argv)
         }
     }
 
-
     if ( not frico::maxwell::init_simulation(sim, arg_simname, arg_geo_path) ) {
+        return EXIT_FAILURE;
+    }
+
+    if (arg_source) {
+        const auto& pgs = sim.msh.physgroups;
+        if ( pgs.find(arg_source) == pgs.end() ) {
+            std::println(stderr, 
+                "Unknown physical group \"{}\": cannot enable source",
+                arg_source);
+            return EXIT_FAILURE;
+        }
+        const auto& pg = sim.msh.physgroups[arg_source];
+        sim.excit = std::make_unique<frico::delta_gap>(pg.entityTags, 1.0);
+    }
+
+    if (not sim.excit) {
+        std::println(stderr, "No sources specified. Exiting.");
         return EXIT_FAILURE;
     }
 

@@ -24,6 +24,7 @@
 #include <vector>
 #include <array>
 #include <optional>
+#include <map>
 
 #include <Eigen/Dense>
 
@@ -104,6 +105,14 @@ struct bf_info {
 
 using triangle_bf_info = std::array<std::optional<bf_info>, 3>;
 
+struct physgroup {
+    int                 dim;
+    int                 tag;
+    std::vector<int>    entityTags;
+};
+
+using physgroupmap_t = std::map<std::string, physgroup>;
+
 struct mesh {
     std::vector<point>          vertices;
     std::vector<bedgeptr>       boundary_edges;
@@ -111,6 +120,7 @@ struct mesh {
     std::vector<triangle>       triangles;
     std::vector<neighbours>     edge_neighbours;
     std::vector<triangle_bf_info>   tbis;
+    physgroupmap_t              physgroups;
 };
 
 template<typename T>
