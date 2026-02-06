@@ -299,6 +299,7 @@ bool run_context(simulation& sim, size_t ctx_number)
 {
     freq_context& context = sim.contexts[ctx_number];
 
+    std::println("********************************************");
     std::println("Sweep step {}: {} Hz", ctx_number, context.frequency); 
 
     auto system_size = num_internal_edges(sim.msh);
@@ -319,7 +320,7 @@ bool run_context(simulation& sim, size_t ctx_number)
     if (sim.excit) {
         compute_rhs(sim, ctx_number, sim.excit.get());
     }
-    
+
     const auto asm_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
     std::println("{} seconds", asm_elapsed_seconds);
@@ -382,10 +383,19 @@ bool run_context(simulation& sim, size_t ctx_number)
     context.fp_P = totP;
     context.fp_Z = z;
 
-    std::complex<double> gamma = (z - 50.0)/(z + 50.0);
+    double Z0 = sim.cfg.Z0;
+
+    std::complex<double> gamma = (z - Z0)/(z + Z0);
     double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
             
-    std::cout << z << " " << swr << " " << totP << std::endl;
+    std::println("Impedance Re/Im: ({:.4f},{:.4f}) Ohm",
+        real(z), imag(z));
+
+    std::println("Impedance abs/angle: {:.4f} Ohm, {:.4f} degrees",
+        abs(z), 180*arg(z)/M_PI);
+    
+    std::println("SWR(Z0 = {:.1f} Ohm): {:.2f}",
+        Z0, swr);
 
     return true;
 }
@@ -564,7 +574,7 @@ bool make_radiation_diagrams(simulation& sim, size_t ctx_number,
         }
     }
 
-    std::println("Max gain: {} dB", 10*std::log10(maxG));
+    std::println("Max gain: {:.2f} dB", 10*std::log10(maxG));
     context.gain = 10*std::log10(maxG);
 
     std::string filename = "polar_" + std::to_string(ctx_number) + ".txt";
