@@ -215,7 +215,7 @@ compute_matrix_approx(simulation& sim, size_t ctx_number)
 }
 
 void
-compute_rhs(simulation& sim, size_t ctx_number, const excitation *ex)
+update_rhs(simulation& sim, size_t ctx_number, const delta_gap& dg)
 {
     auto& context = sim.contexts[ctx_number];
 
@@ -224,21 +224,23 @@ compute_rhs(simulation& sim, size_t ctx_number, const excitation *ex)
 
     for (const auto& ibf : sim.bfuncs) {
     
-        /*
         if (not ibf.interface) {
             continue;
         }
 
-        auto s = ibf.interface.value();
-        if (s == 170) {
-            std::complex<double> entry{0.0, -ibf.length/(omega*MU0)};
-            context.V(ibf.matrix_index) = entry;
-        }
-        */
-
-        std::complex<double> v {0.0, -1.0/(omega*MU0) };
-        context.V(ibf.matrix_index) = v*ex->compute(sim.msh, ibf);
+        for (const auto& itf : dg.interfaces) {
+            if (*ibf.interface == itf) {
+                std::complex<double> v{0.0, -ibf.length/(omega*MU0) };
+                context.V(ibf.matrix_index) += v*dg.voltage;
+            }
+        }        
     }
+}
+
+void
+update_rhs(simulation& sim, size_t ctx_number, const plane_wave& pw)
+{
+
 }
 
 bool init_simulation(simulation& sim, const std::string& name,
@@ -295,110 +297,7 @@ bool init_sweep(simulation& sim, const frequency_range& freqs)
     return true;
 }
 
-bool run_context(simulation& sim, size_t ctx_number)
-{
-    freq_context& context = sim.contexts[ctx_number];
 
-    std::println("********************************************");
-    std::println("Sweep step {}: {} Hz", ctx_number, context.frequency); 
-
-    auto system_size = num_internal_edges(sim.msh);
-    context.Z = zdmatrix::Zero(system_size, system_size);
-    context.V = zdvector::Zero(system_size);
-
-    std::print("  Assemblying linear system..."); std::fflush(stdout);
-    const auto asm_start{std::chrono::steady_clock::now()};
-    if (sim.cfg.approx_matrix) {
-        compute_matrix_approx(sim, ctx_number);
-    } else {
-        compute_matrix(sim, ctx_number);
-    }
-    
-    //delta_gap src({4,5,6,7}, 1.0, 2*M_PI*context.frequency);
-    //delta_gap src({170}, 1.0);
-
-    if (sim.excit) {
-        compute_rhs(sim, ctx_number, sim.excit.get());
-    }
-
-    const auto asm_end{std::chrono::steady_clock::now()};
-    const std::chrono::duration<double> asm_elapsed_seconds{asm_end - asm_start};
-    std::println("{} seconds", asm_elapsed_seconds);
-
-    if (sim.cfg.force_symmetry) {
-        context.Z = ((context.Z+context.Z.transpose())/2.0).eval();
-    }
-
-    std::print("  Solving linear system..."); std::fflush(stdout);
-    const auto start{std::chrono::steady_clock::now()};
-    context.I = context.Z.lu().solve(context.V);
-    const auto end{std::chrono::steady_clock::now()};
-    const std::chrono::duration<double> elapsed_seconds{end - start};
-    std::println("{} seconds", elapsed_seconds);
-
-    context.tri_AJ = zdfield::Zero(sim.msh.triangles.size(), 3);
-    context.tri_AdivJ = zdvector::Zero(sim.msh.triangles.size());
-    context.tri_J = zdfield::Zero(sim.msh.triangles.size(), 3);
-
-    for (const auto& bf : sim.bfuncs) {
-        const auto& Tminus = sim.msh.triangles[bf.itminus];
-        const auto& Tplus = sim.msh.triangles[bf.itplus];
-
-        auto bar_Tminus = barycenter(sim.msh, Tminus);
-        auto bar_Tplus = barycenter(sim.msh, Tplus);
-
-        auto A_Tminus = measure(sim.msh, Tminus);
-        auto A_Tplus = measure(sim.msh, Tplus);
-
-        std::complex<double> Iedge = context.I(bf.matrix_index);
-
-        ezvec3 Jminus = bf.eval_minus(bar_Tminus) * Iedge;
-        ezvec3 Jplus = bf.eval_plus(bar_Tplus) * Iedge;
-
-        context.tri_AJ.row(bf.itminus) += A_Tminus * Jminus;
-        context.tri_AJ.row(bf.itplus) += A_Tplus * Jplus;
-
-        context.tri_AdivJ(bf.itminus) += A_Tminus * bf.div_minus(bar_Tminus) * Iedge;
-        context.tri_AdivJ(bf.itplus) += A_Tplus * bf.div_plus(bar_Tplus) * Iedge;
-
-        context.tri_J.row(bf.itminus) += Jminus;
-        context.tri_J.row(bf.itplus) += Jplus;
-    }
-
-    std::complex<double> totI = 0.0;
-    std::complex<double> totP = 0.0;
-    for (const auto& ibf : sim.bfuncs) {
-        if (not ibf.interface) {
-            continue;
-        }
-
-        //if (ibf.interface.value() == 3)
-            //auto V = context.V(ibf.matrix_index);
-            auto I = ibf.length*context.I(ibf.matrix_index);
-            totP += 0.5*1.0*conj(I);
-            totI += I;
-    }
-    auto z = 1./totI;
-
-    context.fp_P = totP;
-    context.fp_Z = z;
-
-    double Z0 = sim.cfg.Z0;
-
-    std::complex<double> gamma = (z - Z0)/(z + Z0);
-    double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
-            
-    std::println("Impedance Re/Im: ({:.4f},{:.4f}) Ohm",
-        real(z), imag(z));
-
-    std::println("Impedance abs/angle: {:.4f} Ohm, {:.4f} degrees",
-        abs(z), 180*arg(z)/M_PI);
-    
-    std::println("SWR(Z0 = {:.1f} Ohm): {:.2f}",
-        Z0, swr);
-
-    return true;
-}
 
 bool make_sampling_sphere(mesh& msh, const point& center,
     double r, double h)
@@ -655,29 +554,70 @@ bool postpro_context(simulation& sim, size_t ctx_number)
     return true;
 }
 
-bool run(simulation& sim)
-{
-    std::ofstream ofs("outparams.txt");
-    ofs << "Re(Z)  Im(Z)  MaxGain" << std::endl;
-    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
-        run_context(sim, ctx_num);
-        postpro_context(sim, ctx_num);
 
-        const auto& ctx = sim.contexts[ctx_num];
-        if (sim.cfg.dump_matrices) {
-            std::string h5fn = "frico_" + std::to_string(ctx_num) + ".h5";
-            H5Easy::File file(h5fn, H5Easy::File::Truncate);
-            file.createDataSet("/frico/Z", ctx.Z);
-            file.createDataSet("/frico/V", ctx.V);
+void
+compute_port_params(simulation& sim, size_t ctx_number, const delta_gap& dg)
+{
+    auto& context = sim.contexts[ctx_number];
+
+    std::complex<double> totI = 0.0;
+    std::complex<double> totP = 0.0;
+
+    for (const auto& ibf : sim.bfuncs) {
+        if (not ibf.interface) {
+            continue;
         }
 
-        /* dealloc matrix when we're done */
-        sim.contexts[ctx_num].Z.resize(0,0);
-
-        ofs << ctx.fp_Z.real() << " " << ctx.fp_Z.imag() << " ";
-        ofs << ctx.gain << std::endl << std::flush;
+        for (const auto& itf : dg.interfaces) {
+            if (*ibf.interface == itf) {
+                auto I = ibf.length*context.I(ibf.matrix_index);
+                totP += 0.5*dg.voltage*conj(I);
+                totI += I;
+            }
+        }   
     }
-    return true;
+    
+    auto z = 1./totI;
+
+    context.fp_P = totP;
+    context.fp_Z = z;
+
+    double Z0 = sim.cfg.Z0;
+
+    std::complex<double> gamma = (z - Z0)/(z + Z0);
+    double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
+            
+    std::println("Impedance Re/Im: ({:.4f},{:.4f}) Ohm",
+        real(z), imag(z));
+
+    std::println("Impedance abs/angle: {:.4f} Ohm, {:.4f} degrees",
+        abs(z), 180*arg(z)/M_PI);
+    
+    std::println("SWR(Z0 = {:.1f} Ohm): {:.2f}",
+        Z0, swr);
+
 }
+
+void
+postpro_context(simulation& sim, size_t ctx_number, const delta_gap& dg)
+{
+    compute_port_params(sim, ctx_number, dg);
+    make_radiation_diagrams(sim, ctx_number, {0,0,0}, 5.0);
+
+
+    freq_context& context = sim.contexts[ctx_number];
+
+    std::string filename =
+        sim.name + "_" + std::to_string(ctx_number) + ".silo";
+
+    silo db;
+    db.open(filename);
+    db.add_mesh("mesh", sim.msh);
+    db.add_variable("mesh", "J", context.tri_J, var_centering::zonal);
+}
+
+void
+postpro_context(simulation& sim, size_t ctx_number, const plane_wave& pw)
+{}
 
 }

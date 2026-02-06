@@ -30,38 +30,15 @@
 namespace frico {
 
 /**************************************************************/
-class excitation {
-public:
-    excitation(){}
-    virtual std::complex<double>
-    compute(const mesh&, const basis_function &) const = 0;
-    virtual ~excitation(){};
-};
-
-/**************************************************************/
-class plane_wave : public excitation {
+struct plane_wave {
     edvec3 E0_;
     edvec3 kinc_;
-
-public:
-    plane_wave(const edvec3& E0, const edvec3 kinc)
-        : E0_(E0), kinc_(kinc) {};
-    std::complex<double>
-    compute(const mesh&, const basis_function &) const final override;
 };
 
 /**************************************************************/
-class delta_gap : public excitation {
-    std::vector<int>        interfaces_;
-    std::complex<double>    voltage_;
-
-public:
-    delta_gap(std::vector<int> interfaces, std::complex<double> voltage)
-        : interfaces_(interfaces), voltage_(voltage)
-    {}
-
-    std::complex<double>
-    compute(const mesh& msh, const basis_function &bf) const final override;
+struct delta_gap {
+    std::vector<int>        interfaces;
+    std::complex<double>    voltage;
 };
 
 

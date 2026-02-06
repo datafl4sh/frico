@@ -25,6 +25,7 @@
 
 namespace frico {
 
+#if 0
 /**************************************************************/
 std::complex<double>
 plane_wave::compute(const mesh& msh, const basis_function& bf) const
@@ -68,5 +69,5 @@ delta_gap::compute(const mesh& msh, const basis_function& bf) const
 
     return 0.0;
 }
-
+#endif
 } // namespace frico

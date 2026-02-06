@@ -128,25 +128,26 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (arg_source) {
-        const auto& pgs = sim.msh.physgroups;
-        if ( pgs.find(arg_source) == pgs.end() ) {
-            std::println(stderr, 
-                "Unknown physical group \"{}\": cannot enable source",
-                arg_source);
-            return EXIT_FAILURE;
-        }
-        const auto& pg = sim.msh.physgroups[arg_source];
-        sim.excit = std::make_unique<frico::delta_gap>(pg.entityTags, 1.0);
-    }
-
-    if (not sim.excit) {
+    if (not arg_source) {
         std::println(stderr, "No sources specified. Exiting.");
         return EXIT_FAILURE;
     }
 
+    const auto& pgs = sim.msh.physgroups;
+    if ( pgs.find(arg_source) == pgs.end() ) {
+        std::println(stderr, 
+            "Unknown physical group \"{}\": cannot enable source",
+            arg_source);
+        return EXIT_FAILURE;
+    }
+    const auto& pg = sim.msh.physgroups[arg_source];
+    frico::delta_gap dg;
+    dg.interfaces = pg.entityTags;
+    dg.voltage = 1.0;
+
+
     frico::maxwell::init_sweep(sim, *opt_freqs);
-    frico::maxwell::run(sim);
+    frico::maxwell::run(sim, dg);
 
     return EXIT_SUCCESS;
 }
