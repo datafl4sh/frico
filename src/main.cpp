@@ -23,7 +23,7 @@
 #include <cmath>
 
 #include "eigen.h"
-#include <highfive/H5Easy.hpp>
+
 
 #include "geom_mesh.h"
 #include "input_gmsh.h"
@@ -33,7 +33,8 @@
 #include "utils.h"
 #include "sources.h"
 #include "constants.h"
-#include "bem_maxwell.h"
+#include "emw_solver.h"
+#include "emw_postpro_delta_gap.h"
 
 int main(int argc, char **argv)
 {
@@ -147,8 +148,7 @@ int main(int argc, char **argv)
 
 
     frico::maxwell::init_sweep(sim, *opt_freqs);
-    frico::maxwell::run(sim, dg);
-    frico::maxwell::postpro(sim, dg);
+    frico::maxwell::do_sweep(sim, dg);
 
     return EXIT_SUCCESS;
 }

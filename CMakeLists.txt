@@ -8,8 +8,8 @@ set (CMAKE_MODULE_PATH
      ${CMAKE_MODULE_PATH}
      ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS_DEBUGSANITIZED "-g -fsanitize=address")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
 option(OPT_VECTORIZER_REPORT "Show vectorizer reports" OFF)
 if (OPT_VECTORIZER_REPORT)
@@ -101,7 +101,8 @@ endif()
 
 set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
             src/output_silo.cpp src/quadratures.cpp src/rwg_basis.cpp
-            src/utils.cpp src/sources.cpp src/bem_maxwell.cpp
+            src/utils.cpp src/sources.cpp src/emw_solver.cpp
+            src/emw_postpro_delta_gap.cpp src/emw_postpro_common.cpp
 )
 
 add_executable(frico ${SOURCES})

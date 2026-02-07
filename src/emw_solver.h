@@ -19,8 +19,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
 #include <print>
 #include <chrono>
+
+#include "eigen.h"
+#include <highfive/H5Easy.hpp>
 
 #include "geom_mesh.h"
 #include "rwg_basis.h"
@@ -143,34 +148,33 @@ bool run_context(simulation& sim, size_t ctx_number, const Source& src)
     return true;
 }
 
-/**
- * @brief Contains current, impedance and power computed for a specific port
- *        modelled as a delta-gap
- * 
- */
-struct port_values {
-    std::complex<double>    I = 0.0;    // Current
-    std::complex<double>    Z = 0.0;    // Impedance
-    std::complex<double>    P = 0.0;    // Power
-};
 
-port_values compute_port_values(const simulation&, size_t, const delta_gap&);
 
-void postpro_context(simulation&, size_t, const delta_gap&);
+
+
 void postpro_context(simulation&, size_t, const plane_wave&);
+void write_file_headers(const simulation&, const plane_wave&);
+
+
+bool init_sweep(simulation&, const frequency_range&);
+
 
 template<typename Source>
-bool run(simulation& sim, const Source& src)
+bool do_sweep(simulation& sim, const Source& src)
 {
+    write_file_headers(sim, src);
+
     for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
         run_context(sim, ctx_num, src);
+        postpro_context(sim, ctx_num, src);
 
-        const auto& ctx = sim.contexts[ctx_num];
+        /* Dump matrices, if needed*/
         if (sim.cfg.dump_matrices) {
+            const auto& context = sim.contexts[ctx_num];
             std::string h5fn = "frico_" + std::to_string(ctx_num) + ".h5";
-            //H5Easy::File file(h5fn, H5Easy::File::Truncate);
-            //file.createDataSet("/frico/Z", ctx.Z);
-            //file.createDataSet("/frico/V", ctx.V);
+            H5Easy::File file(h5fn, H5Easy::File::Truncate);
+            file.createDataSet("/frico/Z", context.Z);
+            file.createDataSet("/frico/V", context.V);
         }
 
         /* dealloc matrix when we're done */
@@ -179,9 +183,6 @@ bool run(simulation& sim, const Source& src)
     return true;
 }
 
-bool postpro(const simulation& sim, const delta_gap& dg);
 
-
-bool init_sweep(simulation&, const frequency_range&);
 
 } //namespace frico::maxwell
