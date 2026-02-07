@@ -148,6 +148,7 @@ int main(int argc, char **argv)
 
     frico::maxwell::init_sweep(sim, *opt_freqs);
     frico::maxwell::run(sim, dg);
+    frico::maxwell::postpro(sim, dg);
 
     return EXIT_SUCCESS;
 }

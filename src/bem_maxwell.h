@@ -143,17 +143,27 @@ bool run_context(simulation& sim, size_t ctx_number, const Source& src)
     return true;
 }
 
+/**
+ * @brief Contains current, impedance and power computed for a specific port
+ *        modelled as a delta-gap
+ * 
+ */
+struct port_values {
+    std::complex<double>    I = 0.0;    // Current
+    std::complex<double>    Z = 0.0;    // Impedance
+    std::complex<double>    P = 0.0;    // Power
+};
+
+port_values compute_port_values(const simulation&, size_t, const delta_gap&);
+
 void postpro_context(simulation&, size_t, const delta_gap&);
 void postpro_context(simulation&, size_t, const plane_wave&);
 
 template<typename Source>
 bool run(simulation& sim, const Source& src)
 {
-    //std::ofstream ofs("outparams.txt");
-    //ofs << "Re(Z)  Im(Z)  MaxGain" << std::endl;
     for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
         run_context(sim, ctx_num, src);
-        postpro_context(sim, ctx_num, src);
 
         const auto& ctx = sim.contexts[ctx_num];
         if (sim.cfg.dump_matrices) {
@@ -165,12 +175,11 @@ bool run(simulation& sim, const Source& src)
 
         /* dealloc matrix when we're done */
         sim.contexts[ctx_num].Z.resize(0,0);
-
-        //ofs << ctx.fp_Z.real() << " " << ctx.fp_Z.imag() << " ";
-        //ofs << ctx.gain << std::endl << std::flush;
     }
     return true;
 }
+
+bool postpro(const simulation& sim, const delta_gap& dg);
 
 
 bool init_sweep(simulation&, const frequency_range&);

@@ -424,64 +424,96 @@ make_radiation_diagrams(const simulation& sim, size_t ctx_number,
     return true;
 }
 
-bool make_radiation_diagrams(simulation& sim, size_t ctx_number,
-    const point& center, double radius)
+struct gain_data {
+    point       center = {0.0, 0.0, 0.0};
+    double      radius = 5;
+    ddvector    Gxy;
+    ddvector    Gyz;
+    ddvector    Gxz;
+};
+
+/**
+ * @brief Compute the radiation diagrams on the planes XY, YZ and XZ.
+ * 
+ * @param sim 
+ * @param ctx_number 
+ * @param pwr
+ * @param gd
+ * @return double
+ */
+void compute_radiation_diagrams(const simulation& sim, size_t ctx_number,
+    double pwr, gain_data& gd)
 {
-    freq_context& context = sim.contexts[ctx_number];
+    static const int steps = 360;
+    const auto& context = sim.contexts[ctx_number];
 
-    ddvector Gxy = ddvector::Zero(360);
-    ddvector Gyz = ddvector::Zero(360);
-    ddvector Gxz = ddvector::Zero(360);
-
-    double maxG = -std::numeric_limits<double>::infinity();
+    gd.Gxy = ddvector::Zero(steps);
+    gd.Gyz = ddvector::Zero(steps);
+    gd.Gxz = ddvector::Zero(steps);
 
     #pragma omp parallel for
-    for (int deg = 0; deg < 360; deg++) {
+    for (int deg = 0; deg < steps; deg++) {
         double theta = deg*M_PI/180;
         double c = std::cos(theta);
         double s = std::sin(theta);
-        double R = 5.0;
   
         /* XY */ {
-            point Pxy{ R*c, R*s, 0.0 };
-            auto [locE, locH] = eval_fields(sim, ctx_number, Pxy);
+            point Pxy{ gd.radius*c, gd.radius*s, 0.0 };
+            auto R = norm(Pxy);
+            auto [locE, locH] = eval_fields(sim, ctx_number, Pxy+gd.center);
             ezvec3 S = 0.5*locE.cross(locH.conjugate());
             double Prad = std::real(std::sqrt(S.dot(S)));
-            double G = 4*M_PI*R*R*Prad/std::real(context.fp_P);
-            Gxy(deg) = G;
-            maxG = std::max(G, maxG);
+            double G = 4*M_PI*R*R*Prad/pwr;
+            gd.Gxy(deg) = G;
         }
 
         /* YZ */ {
-            point Pyz{ 0.0, R*c, R*s };
-            auto [locE, locH] = eval_fields(sim, ctx_number, Pyz);
+            point Pyz{ 0.0, gd.radius*c, gd.radius*s };
+            auto R = norm(Pyz);
+            auto [locE, locH] = eval_fields(sim, ctx_number, Pyz+gd.center);
             ezvec3 S = 0.5*locE.cross(locH.conjugate());
             double Prad = std::real(std::sqrt(S.dot(S)));
-            double G = 4*M_PI*R*R*Prad/std::real(context.fp_P);
-            Gyz(deg) = G;
-            maxG = std::max(G, maxG);
+            double G = 4*M_PI*R*R*Prad/pwr;
+            gd.Gyz(deg) = G;
         }
 
         /* XZ */ {
-            point Pxz{ -R*c, 0.0, R*s };
-            auto [locE, locH] = eval_fields(sim, ctx_number, Pxz);
+            point Pxz{ -gd.radius*c, 0.0, gd.radius*s };
+            auto R = norm(Pxz);
+            auto [locE, locH] = eval_fields(sim, ctx_number, Pxz+gd.center);
             ezvec3 S = 0.5*locE.cross(locH.conjugate());
             double Prad = std::real(std::sqrt(S.dot(S)));
-            double G = 4*M_PI*R*R*Prad/std::real(context.fp_P);
-            Gxz(deg) = G;
-            maxG = std::max(G, maxG);
+            double G = 4*M_PI*R*R*Prad/pwr;
+            gd.Gxz(deg) = G;
         }
     }
 
-    std::println("Max gain: {:.2f} dB", 10*std::log10(maxG));
-    context.gain = 10*std::log10(maxG);
+    //std::println("Max gain: {:.2f} dB", 10*std::log10(maxG));
+    //context.gain = 10*std::log10(maxG);
 
-    std::string filename = "polar_" + std::to_string(ctx_number) + ".txt";
+}
+
+double
+compute_max_gain(const gain_data& gd)
+{
+    auto maxGxy = gd.Gxy.maxCoeff();
+    auto maxGyz = gd.Gyz.maxCoeff();
+    auto maxGxz = gd.Gxz.maxCoeff();
+    return std::max( {maxGxy, maxGyz, maxGxz} );
+}
+
+bool
+write_radiation_diagrams(const std::string& filename, const gain_data& gd)
+{
     std::ofstream ofs(filename);
+    if ( not ofs.is_open() ) {
+        std::println(stderr, "Can't open '{}' for writing", filename);
+        return false;
+    }
     for (int i = 0; i < 360; i++) {
-        double magGxy = Gxy(i);
-        double magGyz = Gyz(i);
-        double magGxz = Gxz(i);
+        double magGxy = gd.Gxy(i);
+        double magGyz = gd.Gyz(i);
+        double magGxz = gd.Gxz(i);
         ofs << i << " " << magGxy << " " << 10*std::log10(magGxy)
                  << " " << magGyz << " " << 10*std::log10(magGyz)
                  << " " << magGxz << " " << 10*std::log10(magGxz)
@@ -491,7 +523,16 @@ bool make_radiation_diagrams(simulation& sim, size_t ctx_number,
     return true;
 }
 
-bool eval_fields(const simulation& sim, size_t ctx_number,
+/**
+ * @brief Compute fields E and H on all the points of the specified mesh
+ * 
+ * @param sim simulation
+ * @param ctx_number context number
+ * @param smpmsh Sampling mesh
+ * @param E computed E-field
+ * @param H computed H-field
+ */
+void eval_fields(const simulation& sim, size_t ctx_number,
     const mesh& smpmsh, zdfield& E, zdfield& H)
 {
     E = zdfield::Zero(smpmsh.vertices.size(), 3);
@@ -504,8 +545,6 @@ bool eval_fields(const simulation& sim, size_t ctx_number,
         E.row(i) = locE;
         H.row(i) = locH;
     }
-
-    return true;
 }
 
 bool postpro_context(simulation& sim, size_t ctx_number)
@@ -547,7 +586,7 @@ bool postpro_context(simulation& sim, size_t ctx_number)
     db.close();
 
 
-    make_radiation_diagrams(sim, ctx_number, {0,0,0}, 5.0);
+    //make_radiation_diagrams(sim, ctx_number, {0,0,0}, 5.0);
 
 
     
@@ -555,13 +594,49 @@ bool postpro_context(simulation& sim, size_t ctx_number)
 }
 
 
-void
-compute_port_params(simulation& sim, size_t ctx_number, const delta_gap& dg)
+/**
+ * @brief Compute reflection coeff from impedance Z and system impedance Z0
+ * 
+ * @param Z Impedance
+ * @param Z0 System impedance
+ * @return std::complex<double> 
+ */
+std::complex<double>
+compute_reflection_coefficient(std::complex<double> Z, double Z0)
+{
+    return (Z - Z0)/(Z + Z0);
+}
+
+/**
+ * @brief Compute SWR from impedance Z and system impedance Z0
+ * 
+ * @param Z Impedance
+ * @param Z0 System impedance
+ * @return double 
+ */
+double
+compute_swr(std::complex<double> Z, double Z0)
+{
+    std::complex<double> gamma = (Z - Z0)/(Z + Z0);
+    return (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
+}
+
+/**
+ * @brief Compute current, impedance and power for a specific port modelled as
+ *        a delta-gap
+ * 
+ * @param sim the simulation object
+ * @param ctx_number context number
+ * @param dg delta-gap source
+ * @return port_values 
+ */
+port_values
+compute_port_values(const simulation& sim,
+    size_t ctx_number, const delta_gap& dg)
 {
     auto& context = sim.contexts[ctx_number];
 
-    std::complex<double> totI = 0.0;
-    std::complex<double> totP = 0.0;
+    port_values ret;
 
     for (const auto& ibf : sim.bfuncs) {
         if (not ibf.interface) {
@@ -571,40 +646,34 @@ compute_port_params(simulation& sim, size_t ctx_number, const delta_gap& dg)
         for (const auto& itf : dg.interfaces) {
             if (*ibf.interface == itf) {
                 auto I = ibf.length*context.I(ibf.matrix_index);
-                totP += 0.5*dg.voltage*conj(I);
-                totI += I;
+                ret.I += I;
+                ret.P += 0.5*dg.voltage*conj(I);
             }
         }   
     }
     
-    auto z = 1./totI;
+    ret.Z = dg.voltage/ret.I;
 
-    context.fp_P = totP;
-    context.fp_Z = z;
-
-    double Z0 = sim.cfg.Z0;
-
-    std::complex<double> gamma = (z - Z0)/(z + Z0);
-    double swr = (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
-            
-    std::println("Impedance Re/Im: ({:.4f},{:.4f}) Ohm",
-        real(z), imag(z));
-
-    std::println("Impedance abs/angle: {:.4f} Ohm, {:.4f} degrees",
-        abs(z), 180*arg(z)/M_PI);
-    
-    std::println("SWR(Z0 = {:.1f} Ohm): {:.2f}",
-        Z0, swr);
-
+    return ret;
 }
 
 void
-postpro_context(simulation& sim, size_t ctx_number, const delta_gap& dg)
+write_fields(simulation& sim, size_t ctx_number)
 {
-    compute_port_params(sim, ctx_number, dg);
-    make_radiation_diagrams(sim, ctx_number, {0,0,0}, 5.0);
+    /*
+    auto pv = compute_port_values(sim, ctx_number, dg);
+    double swr = compute_swr(pv.Z, sim.cfg.Z0);
+            
+    std::println("Impedance Re/Im: ({:.4f},{:.4f}) Ohm",
+        real(pv.Z), imag(pv.Z));
 
+    std::println("Impedance abs/angle: {:.4f} Ohm, {:.4f} degrees",
+        abs(pv.Z), 180*arg(pv.Z)/M_PI);
+    
+    std::println("SWR(Z0 = {:.1f} Ohm): {:.2f}",
+        sim.cfg.Z0, swr);
 
+    */
     freq_context& context = sim.contexts[ctx_number];
 
     std::string filename =
@@ -614,6 +683,54 @@ postpro_context(simulation& sim, size_t ctx_number, const delta_gap& dg)
     db.open(filename);
     db.add_mesh("mesh", sim.msh);
     db.add_variable("mesh", "J", context.tri_J, var_centering::zonal);
+}
+
+bool write_port_sweep_results(const simulation& sim,
+    const std::vector<port_values>& portvals)
+{
+    std::ofstream port_sweep_ofs("port_sweep.txt");
+    std::println(port_sweep_ofs,
+        "# Port sweep results, Z0 = {:.1f} Ohm",
+        sim.cfg.Z0
+    );
+    std::println(port_sweep_ofs, "# step  frequency    Re(Z)    Im(Z)    SWR");
+
+    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
+        const auto& pv = portvals[ctx_num];
+        std::println(port_sweep_ofs,
+            "{:6}  {:10g}  {:10f}  {:10f}  {:10.3f}",
+            ctx_num, context.frequency, std::real(pv.Z),
+            std::imag(pv.Z), compute_swr(pv.Z, sim.cfg.Z0)
+        );
+    }
+
+    return true;
+}
+
+
+bool postpro(const simulation& sim, const delta_gap& dg)
+{
+    std::vector<port_values> portvals;
+    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
+        /* Compute port quantities (I, Z, P) */
+        const auto& context = sim.contexts[ctx_num];
+        auto pv = compute_port_values(sim, ctx_num, dg);
+        portvals.push_back(pv);
+
+        /* Radiation diagrams */
+        std::string filename = "polar_" + std::to_string(ctx_num) + ".txt";
+        gain_data rad_diags;
+        compute_radiation_diagrams(sim, ctx_num, std::real(pv.P), rad_diags);
+        write_radiation_diagrams(filename, rad_diags);
+    }
+
+    write_port_sweep_results(sim, portvals);
+
+    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
+        write_fields(sim, ctx_num);
+    }
+
+    return true;
 }
 
 void
