@@ -106,6 +106,7 @@ struct bf_info {
 using triangle_bf_info = std::array<std::optional<bf_info>, 3>;
 
 struct physgroup {
+    std::string         name;
     int                 dim;
     int                 tag;
     std::vector<int>    entityTags;

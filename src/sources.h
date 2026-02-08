@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <vector>
 #include <complex>
 
 #include "eigen.h"
@@ -37,6 +38,8 @@ struct plane_wave {
 
 /**************************************************************/
 struct delta_gap {
+    std::string             name;
+    int                     phys_entity;
     std::vector<int>        interfaces;
     std::complex<double>    voltage;
 };

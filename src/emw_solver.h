@@ -69,6 +69,7 @@ struct simulation {
     std::vector<int>            skiptags;   // Surfaces to skip
     std::vector<basis_function> bfuncs;     // Basis functions
     std::vector<freq_context>   contexts;   // Data for each frequency
+    std::vector<double>         delta_gap_signs;
 };
 
 bool init_simulation(simulation&, const std::string&,
@@ -79,13 +80,15 @@ void compute_matrix_approx(simulation&, size_t);
 void update_rhs(simulation&, size_t, const delta_gap&);
 void update_rhs(simulation&, size_t, const plane_wave&);
 
+bool compute_segment_signs(const simulation&, const delta_gap&, std::vector<double>&);
+
 template<typename Source>
 bool run_context(simulation& sim, size_t ctx_number, const Source& src)
 {
     freq_context& context = sim.contexts[ctx_number];
 
     std::println("********************************************");
-    std::println("Sweep step {}: {} Hz", ctx_number, context.frequency); 
+    std::println("Sweep step {}: {} Hz", ctx_number, context.frequency);
 
     auto system_size = num_internal_edges(sim.msh);
     context.Z = zdmatrix::Zero(system_size, system_size);
@@ -163,6 +166,7 @@ template<typename Source>
 bool do_sweep(simulation& sim, const Source& src)
 {
     write_file_headers(sim, src);
+    compute_segment_signs(sim, src, sim.delta_gap_signs);
 
     for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
         run_context(sim, ctx_num, src);

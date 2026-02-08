@@ -22,6 +22,8 @@
 #include <print>
 #include <fstream>
 #include <chrono>
+#include <set>
+#include <list>
 
 #include "eigen.h"
 #include <highfive/H5Easy.hpp>
@@ -214,9 +216,102 @@ compute_matrix_approx(simulation& sim, size_t ctx_number)
     } // for ibf
 }
 
+bool
+compute_segment_signs(const simulation& sim, const delta_gap& dg,
+    std::vector<double>& signs)
+{
+    /* Get all the edges involved in the delta-gap */
+    bool fix_needed = false;
+    std::list<edge> edges;
+    for (const auto& ibf : sim.bfuncs) {
+        if (ibf.interface) {
+            for (const auto& itf : dg.interfaces) {
+                if (*ibf.interface == itf) {
+                    const auto& Tplus = sim.msh.triangles[ibf.itplus];
+                    const auto& Tminus = sim.msh.triangles[ibf.itminus];
+                    if (Tplus.tag <= Tminus.tag) {
+                        fix_needed = true;
+                    }
+                    edges.push_back( sim.msh.edges[ibf.edge_index] );
+                }
+            }
+        }
+    }
+    
+    if (!fix_needed) {
+        return true;
+    }
+
+    std::println("Edge reordering triggered on delta-gap '{}' with tag {}",
+        dg.name, dg.phys_entity);
+
+    if (edges.size() == 0) {
+        std::println("No edges identified for the specified delta-gap");
+        return false;
+    }
+
+    using nodepair = std::pair<size_t, size_t>;
+    std::list<nodepair> seglist;
+
+    /* Init with the first edge of the set */
+    auto eitor = edges.begin();
+    seglist.push_back({eitor->iv0, eitor->iv1});
+    edges.erase(eitor);
+
+    /* Iterate on the remaining edges and connect them in the right place
+     * with the appropriate orientation. This algorithm is quite naive, but
+     * for now does the job. */
+    while (edges.size() > 0) {
+        auto len_before = edges.size();
+        for (eitor = edges.begin(); eitor != edges.end(); /**/) {
+            assert(seglist.size() > 0);
+            auto f = seglist.front();
+            auto b = seglist.back();
+            auto current = eitor++;
+
+            if (edges.size() > 0 and current->iv0 == f.first) {
+                seglist.push_front({current->iv1, current->iv0});
+                edges.erase(current);
+            }
+            if (edges.size() > 0 and current->iv1 == f.first) {
+                seglist.push_front({current->iv0, current->iv1});
+                edges.erase(current);
+            }
+            if (edges.size() > 0 and current->iv0 == b.second) {
+                seglist.push_back({current->iv0, current->iv1});
+                edges.erase(current);
+            }
+            if (edges.size() > 0 and current->iv1 == b.second) {
+                seglist.push_back({current->iv1, current->iv0});
+                edges.erase(current);
+            }
+        }
+        auto len_after = edges.size();
+
+        if (len_after == len_before) {
+            std::println("Invalid source: Entities involved in the "
+                "delta-gap are not topologically connected");
+            return false;
+        }
+    }
+    
+    signs.resize( sim.msh.edges.size() );
+    for (auto& seg : seglist) {
+        auto edgofs = offset(sim.msh.edges, edge(seg.first, seg.second));
+        assert(edgofs);
+        if (seg.first > seg.second)
+            signs[*edgofs] = -1;
+        else
+            signs[*edgofs] = +1;
+    }
+
+    return true;
+}
+
 void
 update_rhs(simulation& sim, size_t ctx_number, const delta_gap& dg)
 {
+
     auto& context = sim.contexts[ctx_number];
 
     double freq = context.frequency;
@@ -231,7 +326,11 @@ update_rhs(simulation& sim, size_t ctx_number, const delta_gap& dg)
         for (const auto& itf : dg.interfaces) {
             if (*ibf.interface == itf) {
                 std::complex<double> v{0.0, -ibf.length/(omega*MU0) };
-                context.V(ibf.matrix_index) += v*dg.voltage;
+                double sign = 1;
+                if (sim.delta_gap_signs.size() > 0) {
+                    sign = sim.delta_gap_signs[ibf.edge_index];
+                }
+                context.V(ibf.matrix_index) += v*dg.voltage*sign;
             }
         }        
     }

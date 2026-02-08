@@ -202,13 +202,12 @@ gmsh_get_physical_groups(mesh& msh)
     gmsh::vectorpair pgroups;
     gmsh::model::getPhysicalGroups(pgroups);
     for (const auto& [dim, tag] : pgroups) {
-        std::string pgname;
-        gmsh::model::getPhysicalName(dim, tag, pgname);
         physgroup pg;
+        gmsh::model::getPhysicalName(dim, tag, pg.name);
         pg.dim = dim;
         pg.tag = tag;
         gmsh::model::getEntitiesForPhysicalGroup(dim, tag, pg.entityTags);
-        msh.physgroups[pgname] = std::move(pg);
+        msh.physgroups[pg.name] = std::move(pg);
     }
 }
 

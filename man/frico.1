@@ -86,10 +86,50 @@ Delete { Surface{3}; }
 \fB\-Z <value>\fR
 Set system impedance for SWR calculations (default: 50 Ohm) 
 
-.SH SEE ALSO
+.SH CAVEATS
+Delta-gap sources can occasionally give some problems. What happens is the
+following:
+.RS 2
+.IP \fBo\fP 4
+The delta-gap is applied on a curve between two entities with different tags
+.IP
+In this case it is assumed (this should be confirmed with GMSH folks) that all
+the triangles in the lower-numbered entity have lower tags than the triangles
+in the higher-numbered entity. In this case there is no problem, because all
+the RWG basis functions are oriented lower-to-higher and therefore all the edges
+in the delta-gap will have coherent orientation.
+.IP \fBo\fP 4
+The delta-gap is applied on curves embedded into a single entity \fBAND\fP the
+curves do not form a closed curve.
+.IP
+In this case the triangles on both sides of the curves will be part of the same
+entity, therefore it is not possible to guarantee the orientation of RWG basis
+functions. The code proceeds by collecting all the edges of the curves, then it
+builds a chain out of them. In building the chain, edges (a,b) with a > b are
+taken as negative, the others as positive. This fixes a coherent orientation on
+the whole delta-gap.
+.IP \fBo\fP 4
+Fancier cases
+.IP
+Not explicitly supported for now, therefore YMMV. Please file a bug describing
+your situation.
+.RE
 .PP
+Be aware of this issue if you get nonsensical results when using delta-gaps.
+This situation can be easily detected by eye by using the "Label" plot in VisIt
+to inspect the numbering of the elements across the delta-gap.
+
+.SH SEE ALSO
+The required theory to understand this code and MoM in general is contained in
+.RS 2
+.IP \fBo\fP 4
+"Field Computations by Moment Methods" by Roger F. Harrington.
+.IP \fBo\fP 4
 "NASA Contractor Report 189594" titled "MOM3D Method of Moments Code - Theory
 Manual" by John F. Shaeffer.
+.IP \fBo\fP 4
+"The Method of Moments in Electromagnetics" by K4LLA Walton C. Gibson.
+.RE
 .PP
 You should visit the Friuli Venezia Giulia region in Italy and taste "Frico",
 which is one of the main regional dishes.

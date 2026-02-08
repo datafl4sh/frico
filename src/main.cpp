@@ -143,6 +143,8 @@ int main(int argc, char **argv)
     }
     const auto& pg = sim.msh.physgroups[arg_source];
     frico::delta_gap dg;
+    dg.name = pg.name;
+    dg.phys_entity = pg.tag;
     dg.interfaces = pg.entityTags;
     dg.voltage = 1.0;
 
