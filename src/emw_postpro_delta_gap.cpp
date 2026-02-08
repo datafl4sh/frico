@@ -32,28 +32,6 @@
 #include "emw_postpro_delta_gap.h"
 namespace frico::maxwell {
 
-bool
-make_radiation_diagrams(const simulation& sim, size_t ctx_number,
-    const mesh& smpmsh, ddvector& gain)
-{
-    const freq_context& context = sim.contexts[ctx_number];
-
-    gain = ddvector::Zero(smpmsh.vertices.size());
-
-    #pragma omp parallel for
-    for (size_t i = 0; i < smpmsh.vertices.size(); i++) {
-        const auto& p = smpmsh.vertices[i];
-        auto [locE, locH] = eval_fields(sim, ctx_number, p);
-        auto R = norm(p);
-        ezvec3 S = 0.5*locE.cross(locH.conjugate());
-        double Prad = std::real(std::sqrt(S.dot(S)));
-        double G = 4*M_PI*R*R*Prad/std::real(context.fp_P);
-        gain(i) = G;
-    }
-
-    return true;
-}
-
 /**
  * @brief Compute the radiation diagrams on the planes XY, YZ and XZ.
  * 
@@ -108,9 +86,6 @@ void compute_radiation_diagrams(const simulation& sim, size_t ctx_number,
             gd.Gxz(deg) = G;
         }
     }
-
-    //std::println("Max gain: {:.2f} dB", 10*std::log10(maxG));
-    //context.gain = 10*std::log10(maxG);
 
 }
 
@@ -238,10 +213,11 @@ postpro_context(const simulation& sim, size_t ctx_num, const delta_gap& dg)
     compute_radiation_diagrams(sim, ctx_num, std::real(pv.P), rad_diags);
     write_radiation_diagrams(filename, rad_diags);
 
+    auto maxG = compute_max_gain(rad_diags);
+    std::println("Max gain: {:.2f} dB", 10*std::log10(maxG));
+    
     /* Fields */
     write_fields(sim, ctx_num);
-
-
 }
 
 }

@@ -51,9 +51,6 @@ struct freq_context {
     zdfield                     tri_J;      // Tri-by-tri current density
     zdfield                     tri_AJ;     
     zdvector                    tri_AdivJ;
-    std::complex<double>        fp_P;
-    std::complex<double>        fp_Z;
-    double                      gain;
 };
 
 enum class simulation_type {
