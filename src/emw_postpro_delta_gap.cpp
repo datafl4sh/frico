@@ -167,10 +167,16 @@ write_fields(const simulation& sim, size_t ctx_number)
     std::string filename =
         sim.name + "_" + std::to_string(ctx_number) + ".silo";
 
+    ddfield normals = ddfield::Zero(sim.msh.triangles.size(), 3);
+    for (int i = 0; i < sim.msh.triangles.size(); i++) {
+        normals.row(i) = normal(sim.msh, sim.msh.triangles[i]);
+    }
+
     silo db;
     db.open(filename);
     db.add_mesh("mesh", sim.msh);
     db.add_variable("mesh", "J", context.tri_J, var_centering::zonal);
+    db.add_variable("mesh", "normals", normals, var_centering::zonal);
 }
 
 void write_file_headers(const simulation& sim, const delta_gap& dg)

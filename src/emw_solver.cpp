@@ -220,19 +220,27 @@ bool
 compute_segment_signs(const simulation& sim, const delta_gap& dg,
     std::vector<double>& signs)
 {
+    auto bf_tris = [](const mesh& msh, const basis_function& bf) ->
+        std::pair<triangle, triangle> {
+        const auto& Tplus = msh.triangles[bf.itplus];
+        const auto& Tminus = msh.triangles[bf.itminus];
+        return {Tminus, Tplus};
+    };
+
     /* Get all the edges involved in the delta-gap */
     bool fix_needed = false;
-    std::list<edge> edges;
+    std::list<std::pair<edge, size_t>> edges;
     for (const auto& ibf : sim.bfuncs) {
         if (ibf.interface) {
             for (const auto& itf : dg.interfaces) {
                 if (*ibf.interface == itf) {
-                    const auto& Tplus = sim.msh.triangles[ibf.itplus];
-                    const auto& Tminus = sim.msh.triangles[ibf.itminus];
+                    const auto& [Tminus, Tplus] = bf_tris(sim.msh, ibf);
                     if (Tplus.tag <= Tminus.tag) {
                         fix_needed = true;
                     }
-                    edges.push_back( sim.msh.edges[ibf.edge_index] );
+                    edges.push_back(
+                        {sim.msh.edges[ibf.edge_index], ibf.matrix_index}
+                    );
                 }
             }
         }
@@ -250,12 +258,16 @@ compute_segment_signs(const simulation& sim, const delta_gap& dg,
         return false;
     }
 
-    using nodepair = std::pair<size_t, size_t>;
+    struct nodepair {
+        size_t first;
+        size_t second;
+        size_t bf_index;
+    };
     std::list<nodepair> seglist;
 
     /* Init with the first edge of the set */
     auto eitor = edges.begin();
-    seglist.push_back({eitor->iv0, eitor->iv1});
+    seglist.push_back({eitor->first.iv0, eitor->first.iv1, eitor->second});
     edges.erase(eitor);
 
     /* Iterate on the remaining edges and connect them in the right place
@@ -267,23 +279,23 @@ compute_segment_signs(const simulation& sim, const delta_gap& dg,
             assert(seglist.size() > 0);
             auto f = seglist.front();
             auto b = seglist.back();
-            auto current = eitor++;
+            auto cur = eitor++;
 
-            if (edges.size() > 0 and current->iv0 == f.first) {
-                seglist.push_front({current->iv1, current->iv0});
-                edges.erase(current);
+            if (edges.size() > 0 and cur->first.iv0 == f.first) {
+                seglist.push_front({cur->first.iv1, cur->first.iv0, cur->second});
+                edges.erase(cur);
             }
-            if (edges.size() > 0 and current->iv1 == f.first) {
-                seglist.push_front({current->iv0, current->iv1});
-                edges.erase(current);
+            if (edges.size() > 0 and cur->first.iv1 == f.first) {
+                seglist.push_front({cur->first.iv0, cur->first.iv1, cur->second});
+                edges.erase(cur);
             }
-            if (edges.size() > 0 and current->iv0 == b.second) {
-                seglist.push_back({current->iv0, current->iv1});
-                edges.erase(current);
+            if (edges.size() > 0 and cur->first.iv0 == b.second) {
+                seglist.push_back({cur->first.iv0, cur->first.iv1, cur->second});
+                edges.erase(cur);
             }
-            if (edges.size() > 0 and current->iv1 == b.second) {
-                seglist.push_back({current->iv1, current->iv0});
-                edges.erase(current);
+            if (edges.size() > 0 and cur->first.iv1 == b.second) {
+                seglist.push_back({cur->first.iv1, cur->first.iv0, cur->second});
+                edges.erase(cur);
             }
         }
         auto len_after = edges.size();
@@ -296,15 +308,29 @@ compute_segment_signs(const simulation& sim, const delta_gap& dg,
     }
     
     signs.resize( sim.msh.edges.size() );
-    for (auto& seg : seglist) {
-        auto edgofs = offset(sim.msh.edges, edge(seg.first, seg.second));
-        assert(edgofs);
-        if (seg.first > seg.second)
-            signs[*edgofs] = -1;
-        else
-            signs[*edgofs] = +1;
-    }
+    const auto& seg0 = seglist.front();
+    const auto& bf0 = sim.bfuncs[ seg0.bf_index ];
+    const auto& Tplus0 = sim.msh.triangles[bf0.itplus];
+    const auto& e0 = sim.msh.edges[bf0.edge_index];
+    auto dir = barycenter(sim.msh, Tplus0) - barycenter(sim.msh, e0);
+    double sign = +1;
 
+    for (auto& seg : seglist) {
+        const auto& bf = sim.bfuncs[ seg.bf_index ];
+        const auto& Tplus = sim.msh.triangles[bf.itplus];
+        const auto& e = sim.msh.edges[bf.edge_index];
+        auto curdir = barycenter(sim.msh, Tplus) - barycenter(sim.msh, e);
+
+        if (dot(dir, curdir) < 0) {
+            sign *= -1;
+        }
+
+        std::print("[({} {}) {}] ", seg.first, seg.second, sign );
+
+        signs[bf.edge_index] = sign;
+        dir = curdir;
+    }
+    std::println();
     return true;
 }
 

@@ -110,6 +110,16 @@ dot(const vec3& a, const vec3& b)
     return a.x()*b.x() + a.y()*b.y() + a.z()*b.z();
 }
 
+inline double
+det(const vec3& v0, const vec3& v1, const vec3& v2)
+{
+    double pos =
+        v0.x()*v1.y()*v2.z() + v1.x()*v2.y()*v0.z() + v2.x()*v0.y()*v1.z();
+    double neg =
+        v1.x()*v0.y()*v2.z() + v0.x()*v2.y()*v1.z() + v2.x()*v1.y()*v0.z();
+    return pos - neg;
+}
+
 inline vec3
 cross(const vec3& a, const vec3& b)
 {
