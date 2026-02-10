@@ -145,7 +145,7 @@ compute_port_values(const simulation& sim,
             if (*ibf.interface == itf) {
                 double sign = 1;
                 if (sim.delta_gap_signs.size() > 0) {
-                    sign = sim.delta_gap_signs[ibf.edge_index];
+                    sign = sim.delta_gap_signs[ibf.matrix_index];
                 }
                 auto I = ibf.length*context.I(ibf.matrix_index)*sign;
                 ret.I += I;

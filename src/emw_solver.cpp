@@ -217,41 +217,38 @@ compute_matrix_approx(simulation& sim, size_t ctx_number)
 }
 
 bool
-compute_segment_signs(const simulation& sim, const delta_gap& dg,
+reorient_deltagap_edges(const simulation& sim, const delta_gap& dg,
     std::vector<double>& signs)
 {
-    auto bf_tris = [](const mesh& msh, const basis_function& bf) ->
-        std::pair<triangle, triangle> {
-        const auto& Tplus = msh.triangles[bf.itplus];
-        const auto& Tminus = msh.triangles[bf.itminus];
-        return {Tminus, Tplus};
-    };
-
     /* Get all the edges involved in the delta-gap */
     bool fix_needed = false;
     std::list<std::pair<edge, size_t>> edges;
     for (const auto& ibf : sim.bfuncs) {
-        if (ibf.interface) {
-            for (const auto& itf : dg.interfaces) {
-                if (*ibf.interface == itf) {
-                    const auto& [Tminus, Tplus] = bf_tris(sim.msh, ibf);
-                    if (Tplus.tag <= Tminus.tag) {
-                        fix_needed = true;
-                    }
-                    edges.push_back(
-                        {sim.msh.edges[ibf.edge_index], ibf.matrix_index}
-                    );
+        if (not ibf.interface) {
+            continue;
+        }
+        for (const auto& itf : dg.interfaces) {
+            if (*ibf.interface == itf) {
+                const auto& Tplus = sim.msh.triangles[ibf.itplus];
+                const auto& Tminus = sim.msh.triangles[ibf.itminus];
+                if (Tplus.tag <= Tminus.tag) {
+                    fix_needed = true;
                 }
+                edges.push_back(
+                    {sim.msh.edges[ibf.edge_index], ibf.matrix_index}
+                );
             }
         }
     }
-    
-    if (!fix_needed) {
+
+    if ( not (fix_needed or sim.cfg.force_reorient_deltagap) ) {
         return true;
     }
 
-    std::println("Edge reordering triggered on delta-gap '{}' with tag {}",
-        dg.name, dg.phys_entity);
+    std::println("Reorientation triggered on delta-gap '{}' with tag {} {}",
+        dg.name, dg.phys_entity,
+        sim.cfg.force_reorient_deltagap ? "[forced]" : ""
+    );
 
     if (edges.size() == 0) {
         std::println("No edges identified for the specified delta-gap");
@@ -270,9 +267,10 @@ compute_segment_signs(const simulation& sim, const delta_gap& dg,
     seglist.push_back({eitor->first.iv0, eitor->first.iv1, eitor->second});
     edges.erase(eitor);
 
-    /* Iterate on the remaining edges and connect them in the right place
-     * with the appropriate orientation. This algorithm is quite naive, but
-     * for now does the job. */
+    /* Iterate on the remaining edges and connect them in the
+     * right place with the appropriate orientation. This algorithm
+     * is quite naive, but for now does the job; we do not expect
+     * delta-gaps with hudreds of edges */
     while (edges.size() > 0) {
         auto len_before = edges.size();
         for (eitor = edges.begin(); eitor != edges.end(); /**/) {
@@ -307,7 +305,11 @@ compute_segment_signs(const simulation& sim, const delta_gap& dg,
         }
     }
     
-    signs.resize( sim.msh.edges.size() );
+    /* OK, we have an ordered chain of edges forming the delta-gap. Compute
+     * the vector from the barycenter of the first edge to the barycenter
+     * of its associated T+. This defines the positive direction. */
+    signs.resize( sim.bfuncs.size() );
+    assert(seglist.size() > 0);
     const auto& seg0 = seglist.front();
     const auto& bf0 = sim.bfuncs[ seg0.bf_index ];
     const auto& Tplus0 = sim.msh.triangles[bf0.itplus];
@@ -316,6 +318,10 @@ compute_segment_signs(const simulation& sim, const delta_gap& dg,
     double sign = +1;
 
     for (auto& seg : seglist) {
+        /* Now start iterating on the edge chain and verify that 
+         * adjacent basis functions have the same orientation
+         * (positive dot product). If not, change sign and
+         * record that. */
         const auto& bf = sim.bfuncs[ seg.bf_index ];
         const auto& Tplus = sim.msh.triangles[bf.itplus];
         const auto& e = sim.msh.edges[bf.edge_index];
@@ -325,12 +331,18 @@ compute_segment_signs(const simulation& sim, const delta_gap& dg,
             sign *= -1;
         }
 
-        std::print("[({} {}) {}] ", seg.first, seg.second, sign );
-
-        signs[bf.edge_index] = sign;
+        signs[bf.matrix_index] = sign;
         dir = curdir;
     }
-    std::println();
+
+    if (sim.cfg.verbose) {
+        std::print("Edges of the delta-gap and orientation: ");
+        for (auto& seg : seglist) {
+            std::print("[({} {}) {:+}] ", seg.first, seg.second, sign );
+        }
+        std::println();
+    }
+
     return true;
 }
 
@@ -354,7 +366,7 @@ update_rhs(simulation& sim, size_t ctx_number, const delta_gap& dg)
                 std::complex<double> v{0.0, -ibf.length/(omega*MU0) };
                 double sign = 1;
                 if (sim.delta_gap_signs.size() > 0) {
-                    sign = sim.delta_gap_signs[ibf.edge_index];
+                    sign = sim.delta_gap_signs[ibf.matrix_index];
                 }
                 context.V(ibf.matrix_index) += v*dg.voltage*sign;
             }
@@ -402,6 +414,7 @@ bool init_simulation(simulation& sim, const std::string& name,
     std::println("        Vertices: {}", sim.msh.vertices.size());
     std::println("           Edges: {}", sim.msh.edges.size());
     std::println("           Cells: {}", sim.msh.triangles.size());
+    std::println("           Beams: {}", sim.msh.beams.size());
     std::println("  Internal edges: {}", num_internal_edges(sim.msh));
 
     make_function_space(sim.msh, sim.bfuncs);

@@ -40,6 +40,8 @@ struct config
     bool            approx_matrix = false;
     bool            force_symmetry = false;
     bool            dump_matrices = false;
+    bool            force_reorient_deltagap = false;
+    bool            verbose = false;
     double          Z0 = 50.0;
 };
 struct freq_context {
@@ -77,7 +79,7 @@ void compute_matrix_approx(simulation&, size_t);
 void update_rhs(simulation&, size_t, const delta_gap&);
 void update_rhs(simulation&, size_t, const plane_wave&);
 
-bool compute_segment_signs(const simulation&, const delta_gap&, std::vector<double>&);
+bool reorient_deltagap_edges(const simulation&, const delta_gap&, std::vector<double>&);
 
 template<typename Source>
 bool run_context(simulation& sim, size_t ctx_number, const Source& src)
@@ -163,7 +165,7 @@ template<typename Source>
 bool do_sweep(simulation& sim, const Source& src)
 {
     write_file_headers(sim, src);
-    compute_segment_signs(sim, src, sim.delta_gap_signs);
+    reorient_deltagap_edges(sim, src, sim.delta_gap_signs);
 
     for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
         run_context(sim, ctx_num, src);

@@ -183,6 +183,8 @@ gmsh_get_boundary_edges(mesh& msh, const std::vector<std::optional<size_t>>& nod
                     mei.errtype = meshing_error::lonely_edge;
                     mei.offending_tag = tag;
                     return std::unexpected(mei);
+                    //msh.beams.push_back(e);
+                    //continue;
                 }
 
                 bedgeptr bep;
@@ -335,11 +337,20 @@ load_from_gmsh(mesh& msh, const load_mode mode, const std::vector<int>& skiptags
         max_index = std::max( {max_index, t.iv0, t.iv1, t.iv2} );
     }
 
+    for (auto& b : msh.beams) {
+        max_index = std::max( {max_index, b.iv0, b.iv1} );
+    }
+
     std::vector<std::optional<size_t>> used(max_index+1);
     for (auto& t : msh.triangles) {
         used[t.iv0] = 1;
         used[t.iv1] = 1;
         used[t.iv2] = 1;
+    }
+
+    for (auto& b : msh.beams) {
+        used[b.iv0] = 1;
+        used[b.iv1] = 1;
     }
 
     int ci = 0;
@@ -366,6 +377,13 @@ load_from_gmsh(mesh& msh, const load_mode mode, const std::vector<int>& skiptags
         t.iv1 = *used[t.iv1];
         assert(used[t.iv2]);
         t.iv2 = *used[t.iv2];
+    }
+
+    for (auto& b : msh.beams) {
+        assert(used[b.iv0]);
+        b.iv0 = *used[b.iv0];
+        assert(used[b.iv1]);
+        b.iv1 = *used[b.iv1];
     }
 
     for (auto& e : msh.edges) {

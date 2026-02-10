@@ -118,6 +118,7 @@ struct mesh {
     std::vector<point>          vertices;
     std::vector<bedgeptr>       boundary_edges;
     std::vector<edge>           edges;
+    std::vector<edge>           beams;
     std::vector<triangle>       triangles;
     std::vector<neighbours>     edge_neighbours;
     std::vector<triangle_bf_info>   tbis;

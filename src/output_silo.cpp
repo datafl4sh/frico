@@ -103,30 +103,36 @@ silo::add_mesh(const std::string& name, const mesh& msh)
     double *coords[] = {x_coords.data(), y_coords.data(), z_coords.data() };
 
     std::vector<int> nodelist;
-    nodelist.reserve( 3*msh.triangles.size() );
+    nodelist.reserve( 3*msh.triangles.size() + 2*msh.beams.size() );
 
-    for (auto& t : msh.triangles)
-    {
-        nodelist.push_back( t.iv0 + 1 );
-        nodelist.push_back( t.iv1 + 1 );
-        nodelist.push_back( t.iv2 + 1 );
+    for (auto& t : msh.triangles) {
+        nodelist.push_back( t.iv0 );
+        nodelist.push_back( t.iv1 );
+        nodelist.push_back( t.iv2 );
+    }
+
+    for (auto& b : msh.beams) {
+        nodelist.push_back( b.iv0 );
+        nodelist.push_back( b.iv1 );
     }
 
     int lnodelist = nodelist.size();
-
-    int shapetype[] = { DB_ZONETYPE_TRIANGLE };
-    int shapesize[] = {3};
-    int shapecounts[] = { static_cast<int>(msh.triangles.size()) };
-    int nshapetypes = 1;
+    int shapetype[] = { DB_ZONETYPE_TRIANGLE, DB_ZONETYPE_BEAM };
+    int shapesize[] = {3, 2};
+    int shapecounts[] = {
+        static_cast<int>(msh.triangles.size()),
+        static_cast<int>(msh.beams.size())
+    };
+    int nshapetypes = 2;
     int nnodes = msh.vertices.size();
-    int nzones = msh.triangles.size();
+    int nzones = msh.triangles.size() + msh.beams.size();
     int ndims = 3;
 
     std::string zlname = "zonelist_";
     zlname += name;
 
     if ( DBPutZonelist2(db_, zlname.c_str(), nzones, ndims,
-        nodelist.data(), lnodelist, 1, 0, 0, shapetype, shapesize,
+        nodelist.data(), lnodelist, 0, 0, 0, shapetype, shapesize,
         shapecounts, nshapetypes, NULL) < 0 ) {
         return false;
     }
@@ -305,6 +311,19 @@ silo::add_variable(const std::string& mesh_name,
         return false;
     }
 
+    return true;
+}
+
+bool
+silo::add_curve(const std::string& name, const std::vector<double>& x,
+    const std::vector<double>& y)
+{
+    if ( x.size() != y.size() ) {
+        return false;
+    }
+
+    DBPutCurve(db_, name.c_str(), x.data(), y.data(),
+        DB_DOUBLE, x.size(), nullptr);
     return true;
 }
 

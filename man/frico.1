@@ -27,6 +27,9 @@ manual.
 \fB\-d\fR
 Dump matrices and right hand sides of all the linear systems.
 .TP
+\fB\-e\fR
+Force reorientation of basis functions involved in the delta-gap (see CAVEATS).
+.TP
 \fB\-g <path>\fR
 Path to the input geometry as .geo file obtained from GMSH.
 .TP
@@ -61,7 +64,7 @@ Set a descriptive name for the simulation. Default is "default".
 \fB\-S\fR
 Expert stuff: In the current implementation the matrix is slightly nonsymmetric
 (only for non-approximate variant) because of the handling of the self elements.
-This flag forces symmetrization by doing 0.5*(Z + Z^T). Don't use.
+This flag forces symmetrization by doing 0.5*(Z + Z^T). Do not use.
 .TP
 \fB\-x <list of tags>\fR
 List of comma-separated tags corresponding to GMSH surfaces you want to exclude
@@ -103,11 +106,12 @@ The delta-gap is applied on curves embedded into a single entity \fBAND\fP the
 curves do not form a closed curve.
 .IP
 In this case the triangles on both sides of the curves will be part of the same
-entity, therefore it is not possible to guarantee the orientation of RWG basis
-functions. The code proceeds by collecting all the edges of the curves, then it
-builds a chain out of them. In building the chain, edges (a,b) with a > b are
-taken as negative, the others as positive. This fixes a coherent orientation on
-the whole delta-gap.
+entity, therefore it is not possible to guarantee a coherent orientation of the
+involved RWG basis functions. In turn, this makes impossible to know the sign
+of the voltage to apply to the edges of the delta-gap. The code employs a
+simple algorithm that checks the orientation of adjacent basis functions, and
+reorients them if it is incoherent. The algorithm works in most cases, but its
+robustness w.r.t. real-world geometries has not been thoroughly tested.
 .IP \fBo\fP 4
 Fancier cases
 .IP

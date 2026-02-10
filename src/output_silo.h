@@ -83,6 +83,10 @@ public:
         var_centering centering
     );
 
+    bool add_curve(const std::string& name, const std::vector<double>& x,
+        const std::vector<double>& y
+    );
+
     ~silo();
 };
 

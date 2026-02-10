@@ -60,13 +60,16 @@ int main(int argc, char **argv)
     const char *arg_simname = "default";
 
     int opt;
-    while ((opt = getopt(argc, argv, "Adf:g:k:n:s:SR:x:Z:")) != -1) {
+    while ((opt = getopt(argc, argv, "Adef:g:k:n:s:SR:x:vZ:")) != -1) {
         switch (opt) {
         case 'A':
             sim.cfg.approx_matrix = true;
             break;
         case 'd':
             sim.cfg.dump_matrices = true;
+            break;
+        case 'e':
+            sim.cfg.force_reorient_deltagap = true;
             break;
         case 'f':
             arg_frequency = optarg;
@@ -88,6 +91,9 @@ int main(int argc, char **argv)
             break;
         case 'R':
             arg_range_expr = optarg;
+            break;
+        case 'v':
+            sim.cfg.verbose = true;
             break;
         case 'x':
             arg_skiptags = optarg;
