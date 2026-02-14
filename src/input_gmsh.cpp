@@ -40,7 +40,7 @@ gmsh_get_vertices(mesh& msh, std::vector<std::optional<size_t>>& node_tag2ofs)
     std::vector<double>     coords;
     std::vector<double>     paraCoords;
 
-    gmsh::model::mesh::getNodes(nodeTags, coords, paraCoords, -1, -1, true, false);
+    gmsh::model::mesh::getNodes(nodeTags, coords, paraCoords, -1, -1, false, false);
 
     auto maxtag_pos = std::max_element(nodeTags.begin(), nodeTags.end());
     
