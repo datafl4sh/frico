@@ -19,8 +19,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "gmsh.h"
 #include "constants.h"
 #include "eigen.h"
+#include "input_gmsh.h"
 #include "geom_mesh.h"
 #include "emw_solver.h"
 namespace frico::maxwell {

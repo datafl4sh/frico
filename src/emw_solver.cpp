@@ -487,6 +487,7 @@ bool make_sampling_sphere(mesh& msh, const point& center,
     return true;
 }
 
+/*
 bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
     double r, double h)
 {
@@ -519,6 +520,43 @@ bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
     if ( not load_from_gmsh(msh, load_mode::quick) ) {
         return false;
     }
+
+    gmsh::clear();
+    gmsh::finalize();
+    return true;
+}
+*/
+
+bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
+    double r, double h)
+{
+    gmsh::initialize();
+    gmsh::option::setNumber("General.Verbosity", 1);
+
+    gmsh::model::add("sampling");
+
+    //int tagxy = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
+    int tagyz = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
+    //int tagxz = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
+    gmsh::model::occ::rotate({{2, tagyz}},
+        c.x(), c.y(), c.z(), c.x(), c.y()+1, c.z(), M_PI/2 );
+    //gmsh::model::occ::rotate({{2, tagxz}},
+    //    c.x(), c.y(), c.z(), c.x()+1, c.y(), c.z(), M_PI/2 );
+
+    //gmsh::vectorpair out;
+    //std::vector<gmsh::vectorpair> outmap;
+    //gmsh::model::occ::fuse({ {2,tagxy}  }, {{2,tagyz}, {2,tagxz}}, out, outmap);
+
+    gmsh::model::occ::synchronize();
+
+    gmsh::vectorpair vp;
+    gmsh::model::getEntities(vp);
+    gmsh::model::mesh::setSize(vp, h);
+
+    gmsh::model::mesh::generate(2);
+    //gmsh::model::mesh::setOrder(1);
+
+    frico::load_from_gmsh(msh, frico::load_mode::quick);
 
     gmsh::clear();
     gmsh::finalize();
