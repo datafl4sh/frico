@@ -103,6 +103,7 @@ set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
             src/output_silo.cpp src/quadratures.cpp src/rwg_basis.cpp
             src/utils.cpp src/sources.cpp src/emw_solver.cpp
             src/emw_postpro_delta_gap.cpp src/emw_postpro_common.cpp
+            src/lapack_wrappers.cpp
 )
 
 add_executable(frico ${SOURCES})

@@ -31,6 +31,7 @@
 #include "rwg_basis.h"
 #include "sources.h"
 #include "utils.h"
+#include "lapack_wrappers.h"
 
 namespace frico::maxwell {
 
@@ -114,6 +115,7 @@ bool run_context(simulation& sim, size_t ctx_number, const Source& src)
     std::print("  Solving linear system..."); std::fflush(stdout);
     const auto start{std::chrono::steady_clock::now()};
     context.I = context.Z.lu().solve(context.V);
+    //solve(context.Z, context.V, context.I);
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
     std::println("{} seconds", elapsed_seconds);
