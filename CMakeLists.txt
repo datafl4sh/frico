@@ -1,4 +1,24 @@
-cmake_minimum_required(VERSION 3.20)
+#
+# FRICO - Friendly Radiation Integral COde
+#
+# Copyright (c) 2025, Matteo Cicuttin - IV3IWE
+# Politecnico di Torino
+# Dipartimento di Scienze Matematiche "G. L. Lagrange"
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+# 
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+cmake_minimum_required(VERSION 3.30)
 project(frico)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -15,6 +35,11 @@ option(OPT_VECTORIZER_REPORT "Show vectorizer reports" OFF)
 if (OPT_VECTORIZER_REPORT)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Rpass=loop-vectorize \
         -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize")
+endif()
+
+option(OPT_AGGRESSIVE_FP "Enable unsafe FP optimizations" OFF)
+if (OPT_AGGRESSIVE_FP)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -ffast-math")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -79,13 +104,31 @@ else()
 endif()
 
 ######################################################################
-## Intel MKL: this MUST remain OPTIONAL
-set(MKL_INTERFACE_FULL intel_lp64)
-find_package(MKL CONFIG)
-if (MKL_FOUND)
-  set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
-  add_compile_definitions(-DHAVE_MKL)
+## BLAS & LAPACK: this MUST remain OPTIONAL
+find_package(BLAS)
+if (BLAS_FOUND)
+    set(LINK_LIBS ${LINK_LIBS} BLAS::BLAS)
 endif()
+
+find_package(LAPACK)
+if (LAPACK)
+    set(LINK_LIBS ${LINK_LIBS} LAPACK::LAPACK)
+    add_compile_definitions(-DHAVE_LAPACK)
+endif()
+
+######################################################################
+## Intel MKL: this MUST remain OPTIONAL
+#set(MKL_INTERFACE_FULL intel_lp64)
+#find_package(MKL CONFIG)
+#if (MKL_FOUND)
+#  set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
+#  add_compile_definitions(-DHAVE_MKL)
+#  add_compile_definitions(-DHAVE_LAPACK)
+#endif()
+
+#set(LINK_LIBS ${LINK_LIBS} "/opt/amd-biy/lib/libaocl.so")
+#add_compile_definitions(-DHAVE_LAPACK)
+
 
 ######################################################################
 ## Sources and targets
