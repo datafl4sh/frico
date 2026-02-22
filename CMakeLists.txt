@@ -111,9 +111,9 @@ if (BLAS_FOUND)
 endif()
 
 find_package(LAPACK)
-if (LAPACK)
+if (LAPACK_FOUND)
     set(LINK_LIBS ${LINK_LIBS} LAPACK::LAPACK)
-    add_compile_definitions(-DHAVE_LAPACK)
+    add_definitions(-DHAVE_LAPACK)
 endif()
 
 ######################################################################

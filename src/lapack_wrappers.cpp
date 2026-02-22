@@ -28,6 +28,16 @@
 #include "lapack_wrappers.h"
 
 extern "C" {
+    void zgetrf_(int* m, int* n,
+                 std::complex<double>* a, int* lda,
+                 int* ipiv, int* info);
+
+    void zgetrs_(char* trans, int* n, int* nrhs,
+                 std::complex<double>* a, int* lda,
+                 int* ipiv,
+                 std::complex<double>* b, int* ldb,
+                 int* info);
+
     void zsytrf_(const char* uplo, const int* n, std::complex<double>* a,
                  const int* lda, int* ipiv, std::complex<double>* work,
                  const int* lwork, int* info);
@@ -40,7 +50,89 @@ extern "C" {
 
 #ifdef HAVE_LAPACK
 
-bool solve(Eigen::MatrixXcd& A, const Eigen::VectorXcd& b,
+bool solve_general(Eigen::MatrixXcd& A, const Eigen::VectorXcd& b,
+    Eigen::VectorXcd& x)
+{
+    assert(A.rows() == A.cols());
+    assert(A.rows() == b.size());
+
+    x = b;
+
+    int n    = static_cast<int>(A.rows());
+    int nrhs = 1;
+    int lda  = n;
+    int ldb  = n;
+    int info;
+
+    std::vector<int> ipiv(n);
+
+    zgetrf_(&n, &n, A.data(), &lda, ipiv.data(), &info);
+
+    if (info < 0) {
+        std::println(stderr, "ZGETRF invalid argument");
+        return false;
+    }
+
+    if (info > 0) {
+        std::println(stderr, "ZGETRF singular matrix");
+        return false;
+    }
+
+    char trans = 'N';
+
+    zgetrs_(&trans, &n, &nrhs, A.data(), &lda, ipiv.data(),
+            x.data(), &ldb, &info);
+
+    if (info != 0)  {
+        std::println(stderr, "ZGETRS failed");
+        return false;
+    }
+
+    return true;
+}
+
+bool solve_general(Eigen::MatrixXcd& A, const Eigen::MatrixXcd& B,
+    Eigen::MatrixXcd& X)
+{
+    assert(A.rows() == A.cols());
+    assert(A.cols() == B.rows());
+
+    X = B;
+
+    int n    = static_cast<int>(A.rows());
+    int nrhs = static_cast<int>(B.cols());
+    int lda  = n;
+    int ldb  = n;
+    int info;
+
+    std::vector<int> ipiv(n);
+
+    zgetrf_(&n, &n, A.data(), &lda, ipiv.data(), &info);
+
+    if (info < 0) {
+        std::println(stderr, "ZGETRF invalid argument");
+        return false;
+    }
+
+    if (info > 0) {
+        std::println(stderr, "ZGETRF singular matrix");
+        return false;
+    }
+
+    char trans = 'N';
+
+    zgetrs_(&trans, &n, &nrhs, A.data(), &lda, ipiv.data(),
+            X.data(), &ldb, &info);
+
+    if (info != 0)  {
+        std::println(stderr, "ZGETRS failed");
+        return false;
+    }
+
+    return true;
+}
+
+bool solve_symmetric(Eigen::MatrixXcd& A, const Eigen::VectorXcd& b,
     Eigen::VectorXcd& x) {
     assert(A.rows() == A.cols());
     assert(A.rows() == b.size());

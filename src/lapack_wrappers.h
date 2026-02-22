@@ -25,7 +25,13 @@
 
 #ifdef HAVE_LAPACK
 
-bool solve(Eigen::MatrixXcd& A, const Eigen::VectorXcd& b,
+bool solve_general(Eigen::MatrixXcd& A, const Eigen::VectorXcd& b,
+    Eigen::VectorXcd& x);
+
+bool solve_general(Eigen::MatrixXcd& A, const Eigen::MatrixXcd& B,
+    Eigen::MatrixXcd& X);
+
+bool solve_symmetric(Eigen::MatrixXcd& A, const Eigen::VectorXcd& b,
     Eigen::VectorXcd& x);
 
 #endif /* HAVE_LAPACK */
