@@ -19,7 +19,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
 cmake_minimum_required(VERSION 3.30)
-project(frico)
+project(frico VERSION 0.0.0)
+
+include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -150,5 +152,39 @@ set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
 )
 
 add_executable(frico ${SOURCES})
-
 target_link_libraries(frico PUBLIC ${LINK_LIBS})
+
+install(TARGETS frico
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(FILES man/frico.1
+    DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+
+#install(DIRECTORY share/examples/
+#    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/examples
+#)
+
+######################################################################
+## Packaging
+set(CPACK_PACKAGE_NAME "frico")
+set(CPACK_PACKAGE_VENDOR "Matteo Cicuttin")
+set(CPACK_PACKAGE_CONTACT "matteo.cicuttin@polito.it")
+
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Friendly Radiation Integral COde - a MoM solver")
+
+#set(CPACK_RESOURCE_FILE_LICENSE
+#    "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+set(CPACK_GENERATOR "DEB")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Matteo Cicuttin")
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_DEBIAN_PACKAGE_DEPENDS
+    "gmsh, libsiloh5-0t64, gnuplot, libhdf5-dev"
+    )
+
+include(CPack)

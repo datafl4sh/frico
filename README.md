@@ -12,6 +12,49 @@ FRICO was developed because of a lack of free and open-source 3D MoM solvers and
  * [Eigen](https://libeigen.gitlab.io/) for linear algebra
  * [HighFive](https://bluebrain.github.io/HighFive/) for HDF5 I/O
 
----
+## System requirements and installation
+
+FRICO runs on Unix systems, Windows is explicitly NOT supported. It will
+probably run fine under WSL, but there is no guarantee about this.
+
+The official way of obtaining FRICO is by downloading the source from this repository and compiling it on your machine. In order to successfully compile FRICO, apart from the packages listed above, you need a compiler supporting
+C++23 and a fairly recent version of CMake.
+
+### Installing prerequisites
+
+On a Debian system, the prerequisites for FRICO can be installed with
+
+    apt install libgmsh-dev gmsh libsilo-dev gnuplot libeigen3-dev libhdf5-dev
+
+The visualization software VisIt is not available in the Debian packages and it is downloadable [here](https://sd.llnl.gov/simulation/computer-codes/visit).
+
+### Compiling and installing FRICO
+
+As FRICO is based on CMake, the steps to compile it are the usual ones:
+
+    git clone https://github.com/datafl4sh/frico.git
+    cd frico
+    mkdir build
+    cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j `nproc`
+    make install   # May need to be run with `sudo`
+
+## Running FRICO
+
+FRICO is a text-based application and the general workflow is the
+following:
+
+ * With GMSH, prepare the geometry you want to simulate
+ * Run FRICO on the GMSH geometry
+ * Use VisIt to visualize the computed fields, or use GNUPLOT (or any other
+   plotting tool) to visualize the radiation pattens and frequency sweep
+   results.
+
+## Documentation
+
+The authoritative documentation for FRICO is its man page and it is located in the `man` directory in the source tree. If you installed FRICO in a system location, just say `man frico`, otherwise go to the `man` directory in the source tree and say `man ./frico.1`.
+
+## Closing remarks
 
 This software is proudly Friulian-made by IV3IWE, so that's the real reason of its name. For more Friulian-flavoured software you can also take a look to [MUSET](https://github.com/rvicedomini/muset).

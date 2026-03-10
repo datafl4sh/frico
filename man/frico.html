@@ -1,0 +1,374 @@
+<!-- Creator     : groff version 1.23.0 -->
+<!-- CreationDate: Tue Mar 10 17:07:22 2026 -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta name="generator" content="groff -Thtml, see www.gnu.org">
+<meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+<meta name="Content-Style" content="text/css">
+<style type="text/css">
+       p       { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       pre     { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       table   { margin-top: 0; margin-bottom: 0; vertical-align: top }
+       h1      { text-align: center }
+</style>
+<title>frico</title>
+
+</head>
+<body>
+
+<h1 align="center">frico</h1>
+
+<a href="#NAME">NAME</a><br>
+<a href="#SYNOPSIS">SYNOPSIS</a><br>
+<a href="#DESCRIPTION">DESCRIPTION</a><br>
+<a href="#OPTIONS">OPTIONS</a><br>
+<a href="#CAVEATS">CAVEATS</a><br>
+<a href="#SEE ALSO">SEE ALSO</a><br>
+<a href="#BUGS">BUGS</a><br>
+<a href="#AUTHOR">AUTHOR</a><br>
+<a href="#COPYRIGHT">COPYRIGHT</a><br>
+
+<hr>
+
+
+<h2>NAME
+<a name="NAME"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">frico - Friendly
+Radiation Integral COde</p>
+
+<h2>SYNOPSIS
+<a name="SYNOPSIS"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em"><b>frico</b>
+[<i>OPTION</i>]...</p>
+
+<h2>DESCRIPTION
+<a name="DESCRIPTION"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">A 3D Method of
+Moments code for the simulation of antennas and scattering
+structures.</p>
+
+<p style="margin-left:9%; margin-top: 1em">This code
+implements the Method of Moments (MoM) as described in
+&quot;NASA Contractor Report 189594&quot; titled &quot;MOM3D
+Method of Moments Code - Theory Manual&quot; by John F.
+Shaeffer.</p>
+
+<p style="margin-left:9%; margin-top: 1em">The code takes
+as input a GMSH .geo file and some parameters specifying the
+sources and the simulation frequency. The output is written
+to text files (for impedance and radiation patterns) and
+SILO files for the visualization of fields using VisIt.</p>
+
+<h2>OPTIONS
+<a name="OPTIONS"></a>
+</h2>
+
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="3%">
+
+
+<p style="margin-top: 1em"><b>-A</b></p></td>
+<td width="6%"></td>
+<td width="82%">
+
+
+<p style="margin-top: 1em">Do not use quadratures, use
+approximate matrix as described in the MOM3D theory
+manual.</p> </td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="3%">
+
+
+<p><b>-d</b></p></td>
+<td width="6%"></td>
+<td width="82%">
+
+
+<p>Dump matrices and right hand sides of all the linear
+systems.</p> </td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="3%">
+
+
+<p><b>-e</b></p></td>
+<td width="6%"></td>
+<td width="82%">
+
+
+<p>Force reorientation of basis functions involved in the
+delta-gap (see CAVEATS).</p></td></tr>
+</table>
+
+<p style="margin-left:9%;"><b>-g &lt;path&gt;</b></p>
+
+<p style="margin-left:18%;">Path to the input geometry as
+.geo file obtained from GMSH.</p>
+
+<p style="margin-left:9%;"><b>-f &lt;frequency&gt;</b></p>
+
+<p style="margin-left:18%;">Simulation frequency specified
+in Hz. Exponential notation may be used. Mutually exclusive
+with -R.</p>
+
+<p style="margin-left:9%;"><b>-s &lt;physgroup&gt;</b></p>
+
+<p style="margin-left:18%;">Currently only antenna
+simulation is supported, therefore only delta-gap sources
+are allowed. Delta-gap voltage is applied to one or more
+curves that need to be grouped in a physical group of your
+GMSH model. For example, if a delta-gap source on curves
+4,5,6 and 7 is wanted, you need to put in your GMSH model
+something like</p>
+
+<p style="margin-left:23%; margin-top: 1em">Physical
+Curve(&quot;source&quot;, 10) = {4,5,6,7};</p>
+
+<p style="margin-left:9%;"><b>-R
+&lt;start&gt;:&lt;step&gt;:&lt;end&gt;</b></p>
+
+<p style="margin-left:18%;">Do a sweep from &lt;start&gt;
+Hz to &lt;end&gt; Hz at steps of &lt;step&gt; Hz.
+Frequencies may be specified using exponential notation.
+Mutually exclusive with -f.</p>
+
+<p style="margin-left:9%;"><b>-k &lt;order&gt;</b></p>
+
+<p style="margin-left:18%;">Integration order to be used
+when not in approximate mode (-A). Default is 1.</p>
+
+<p style="margin-left:9%;"><b>-n &lt;name&gt;</b></p>
+
+<p style="margin-left:18%;">Set a descriptive name for the
+simulation. Default is &quot;default&quot;.</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="3%">
+
+
+<p><b>-S</b></p></td>
+<td width="6%"></td>
+<td width="82%">
+
+
+<p>Expert stuff: In the current implementation the matrix
+is slightly nonsymmetric (only for non-approximate variant)
+because of the handling of the self elements. This flag
+forces symmetrization by doing 0.5*(Z + Z&#710;T). Do not
+use.</p> </td></tr>
+</table>
+
+<p style="margin-left:9%;"><b>-x &lt;list of
+tags&gt;</b></p>
+
+<p style="margin-left:18%;">List of comma-separated tags
+corresponding to GMSH surfaces you want to exclude from
+loading. This is useful when in your mesh you have edges
+with more than two triangles attached, but the option exists
+only for convenience. The proper way to do this is to delete
+surfaces directly in the .geo file, for example:</p>
+
+
+<p style="margin-left:23%; margin-top: 1em">SetFactory(&quot;OpenCASCADE&quot;);
+<br>
+Cylinder(1) = {0, 0, 0, 1, 0, 0, 0.01, 2*Pi}; <br>
+Cylinder(2) = {-1, 0, 0, 1, 0, 0, 0.01, 2*Pi}; <br>
+Coherence; <br>
+MeshSize{ PointsOf{ Surface{:}; } } = 0.01; <br>
+Mesh 2; <br>
+Delete { Volume{1,2}; } <br>
+Delete { Surface{3}; }</p>
+
+<p style="margin-left:9%;"><b>-Z &lt;value&gt;</b></p>
+
+<p style="margin-left:18%;">Set system impedance for SWR
+calculations (default: 50 Ohm)</p>
+
+<h2>CAVEATS
+<a name="CAVEATS"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">Delta-gap
+sources can occasionally give some problems. What happens is
+the following:</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="12%"></td>
+<td width="1%">
+
+
+<p><b>o</b></p></td>
+<td width="4%"></td>
+<td width="83%">
+
+
+<p>The delta-gap is applied on a curve between two entities
+with different tags</p></td></tr>
+</table>
+
+<p style="margin-left:17%; margin-top: 1em">In this case it
+is assumed (this should be confirmed with GMSH folks) that
+all the triangles in the lower-numbered entity have lower
+tags than the triangles in the higher-numbered entity. In
+this case there is no problem, because all the RWG basis
+functions are oriented lower-to-higher and therefore all the
+edges in the delta-gap will have coherent orientation.</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="12%"></td>
+<td width="1%">
+
+
+<p style="margin-top: 1em"><b>o</b></p></td>
+<td width="4%"></td>
+<td width="83%">
+
+
+<p style="margin-top: 1em">The delta-gap is applied on
+curves embedded into a single entity <b>AND</b> the curves
+do not form a closed curve.</p></td></tr>
+</table>
+
+<p style="margin-left:17%; margin-top: 1em">In this case
+the triangles on both sides of the curves will be part of
+the same entity, therefore it is not possible to guarantee a
+coherent orientation of the involved RWG basis functions. In
+turn, this makes impossible to know the sign of the voltage
+to apply to the edges of the delta-gap. The code employs a
+simple algorithm that checks the orientation of adjacent
+basis functions, and reorients them if it is incoherent. The
+algorithm works in most cases, but its robustness w.r.t.
+real-world geometries has not been thoroughly tested.</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="12%"></td>
+<td width="1%">
+
+
+<p style="margin-top: 1em"><b>o</b></p></td>
+<td width="4%"></td>
+<td width="16%">
+
+
+<p style="margin-top: 1em">Fancier cases</p></td>
+<td width="67%">
+</td></tr>
+</table>
+
+<p style="margin-left:17%; margin-top: 1em">Not explicitly
+supported for now, therefore YMMV. Please file a bug
+describing your situation.</p>
+
+<p style="margin-left:9%; margin-top: 1em">Be aware of this
+issue if you get nonsensical results when using delta-gaps.
+This situation can be easily detected by eye by using the
+&quot;Label&quot; plot in VisIt to inspect the numbering of
+the elements across the delta-gap.</p>
+
+<h2>SEE ALSO
+<a name="SEE ALSO"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">The required
+theory to understand this code and MoM in general is
+contained in</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="12%"></td>
+<td width="1%">
+
+
+<p style="margin-top: 1em"><b>o</b></p></td>
+<td width="4%"></td>
+<td width="83%">
+
+
+<p style="margin-top: 1em">&quot;Field Computations by
+Moment Methods&quot; by Roger F. Harrington.</p></td></tr>
+<tr valign="top" align="left">
+<td width="12%"></td>
+<td width="1%">
+
+
+<p><b>o</b></p></td>
+<td width="4%"></td>
+<td width="83%">
+
+
+<p>&quot;NASA Contractor Report 189594&quot; titled
+&quot;MOM3D Method of Moments Code - Theory Manual&quot; by
+John F. Shaeffer.</p></td></tr>
+<tr valign="top" align="left">
+<td width="12%"></td>
+<td width="1%">
+
+
+<p><b>o</b></p></td>
+<td width="4%"></td>
+<td width="83%">
+
+
+<p>&quot;The Method of Moments in Electromagnetics&quot; by
+K4LLA Walton C. Gibson.</p></td></tr>
+</table>
+
+<p style="margin-left:9%; margin-top: 1em">You should visit
+the Friuli Venezia Giulia region in Italy and taste
+&quot;Frico&quot;, which is one of the main regional
+dishes.</p>
+
+<h2>BUGS
+<a name="BUGS"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">Report bugs to
+&lt;matteo.cicuttin@polito.it&gt;</p>
+
+<h2>AUTHOR
+<a name="AUTHOR"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">Written by
+IV3IWE Matteo Cicuttin</p>
+
+<h2>COPYRIGHT
+<a name="COPYRIGHT"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">Copyright (C)
+2025-2026 Matteo Cicuttin - Politecnico di Torino</p>
+<hr>
+</body>
+</html>
