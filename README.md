@@ -57,6 +57,12 @@ The authoritative documentation for FRICO is its man page and it is located in t
 
 In `share/examples` you can find some usage examples of FRICO. Given that FRICO is a code in its early stages, you are encouraged to compare those examples with the results of other codes, like NEC or FEKO.
 
+## References
+
+* NASA Contractor Report 189594, _MOM3D Method of Moments Code - Theory Manual_,  John F. Shaeffer
+* _Field computation by Moment Methods_, Roger Harrington
+* _The Method of Moments in Electromagnetics_, Walton C. Gibson K4LLA
+
 ## Closing remarks
 
 This software is proudly Friulian-made by IV3IWE, so that's the real reason of its name. For more Friulian-flavoured software you can also take a look to [MUSET](https://github.com/rvicedomini/muset).
