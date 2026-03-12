@@ -24,7 +24,7 @@
 
 namespace frico {
 
-void make_function_space(const mesh& msh, std::vector<basis_function>& bfs)
+void make_function_space(const mesh& msh, std::vector<rwg_basis_function>& bfs)
 {
     bfs.reserve( num_internal_edges(msh) );
     size_t matrix_index = 0;
@@ -49,7 +49,7 @@ void make_function_space(const mesh& msh, std::vector<basis_function>& bfs)
         size_t ipminus = ivtminus[evmap[en.loc_eminus]];
         size_t ipplus = ivtplus[evmap[en.loc_eplus.value()]];
 
-        basis_function bf;
+        rwg_basis_function bf;
         bf.Aminus = measure(msh, Tminus);
         bf.Aplus = measure(msh, Tplus);
         bf.itminus = en.itminus;

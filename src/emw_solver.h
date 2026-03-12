@@ -62,14 +62,14 @@ enum class simulation_type {
 };
 
 struct simulation {
-    std::string                 name;       // Simulation name
-    simulation_type             type;       // Type of simulation
-    config                      cfg;        // Simulation config
-    mesh                        msh;        // Mesh
-    std::vector<int>            skiptags;   // Surfaces to skip
-    std::vector<basis_function> bfuncs;     // Basis functions
-    std::vector<freq_context>   contexts;   // Data for each frequency
-    std::vector<double>         delta_gap_signs;
+    std::string                     name;       // Simulation name
+    simulation_type                 type;       // Type of simulation
+    config                          cfg;        // Simulation config
+    mesh                            msh;        // Mesh
+    std::vector<int>                skiptags;   // Surfaces to skip
+    std::vector<rwg_basis_function> bfuncs;     // Basis functions
+    std::vector<freq_context>       contexts;   // Data for each frequency
+    std::vector<double>             delta_gap_signs;
 };
 
 bool init_simulation(simulation&, const std::string&,

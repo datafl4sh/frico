@@ -38,7 +38,7 @@ namespace frico {
  * T+ has sign +1 and T- has sign -1.
  * Beware that Gibson uses a different, opposite convention.
  */
-struct basis_function
+struct rwg_basis_function
 {
     double  Aminus;         // area of T-
     double  Aplus;          // area of T+
@@ -62,45 +62,45 @@ struct basis_function
 };
 
 inline vec3
-basis_function::rho_minus(const point& r) const
+rwg_basis_function::rho_minus(const point& r) const
 {
     return r - pminus;
 }
 
 inline vec3
-basis_function::rho_plus(const point& r) const
+rwg_basis_function::rho_plus(const point& r) const
 {
     return r - pplus;
 }
 
 inline edvec3
-basis_function::eval_minus(const point& r) const
+rwg_basis_function::eval_minus(const point& r) const
 {
     auto f = -length*rho_minus(r)/(2.0*Aminus);
     return { f.x(), f.y(), f.z() };
 }
 
 inline edvec3
-basis_function::eval_plus(const point& r) const
+rwg_basis_function::eval_plus(const point& r) const
 {
     auto f = length*rho_plus(r)/(2.0*Aplus);
     return { f.x(), f.y(), f.z() };
 }
 
 inline double
-basis_function::div_minus(const point& r) const
+rwg_basis_function::div_minus(const point& r) const
 {
     return -length/Aminus;
 }
 
 inline double
-basis_function::div_plus(const point& r) const
+rwg_basis_function::div_plus(const point& r) const
 {
     return length/Aplus;
 }
 
 inline std::ostream&
-operator<<(std::ostream& os, const basis_function& bf)
+operator<<(std::ostream& os, const rwg_basis_function& bf)
 {
     os << "Eidx: " << bf.edge_index << ", ";
     os << "Midx: " << bf.matrix_index << ", ";
@@ -109,6 +109,6 @@ operator<<(std::ostream& os, const basis_function& bf)
     return os;
 }
 
-void make_function_space(const mesh&, std::vector<basis_function>&);
+void make_function_space(const mesh&, std::vector<rwg_basis_function>&);
 
 } // frico
