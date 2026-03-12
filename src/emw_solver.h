@@ -114,8 +114,15 @@ bool run_context(simulation& sim, size_t ctx_number, const Source& src)
 
     std::print("  Solving linear system..."); std::fflush(stdout);
     const auto start{std::chrono::steady_clock::now()};
+#ifdef HAVE_LAPACK
+    if (sim.cfg.approx_matrix or sim.cfg.force_symmetry) {
+        solve_symmetric(context.Z, context.V, context.I);
+    } else {
+        solve_general(context.Z, context.V, context.I);
+    }
+#else
     context.I = context.Z.lu().solve(context.V);
-    //solve_general(context.Z, context.V, context.I);
+#endif    
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
     std::println("{} seconds", elapsed_seconds);

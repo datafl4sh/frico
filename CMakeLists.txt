@@ -78,7 +78,7 @@ if (NOT DEFINED HIGHFIVE_USE_BOOST)
     set(HIGHFIVE_USE_BOOST Off)
 endif()
 
-add_subdirectory(deps/HighFive)
+add_subdirectory(deps/HighFive EXCLUDE_FROM_ALL)
 set(LINK_LIBS ${LINK_LIBS} HighFive)
 
 ######################################################################
@@ -106,27 +106,29 @@ else()
 endif()
 
 ######################################################################
-## BLAS & LAPACK: this MUST remain OPTIONAL
-find_package(BLAS)
-if (BLAS_FOUND)
-    set(LINK_LIBS ${LINK_LIBS} BLAS::BLAS)
-endif()
-
-find_package(LAPACK)
-if (LAPACK_FOUND)
-    set(LINK_LIBS ${LINK_LIBS} LAPACK::LAPACK)
-    add_definitions(-DHAVE_LAPACK)
-endif()
+## Try to find a LAPACK
+set(TRY_OTHER_LAPACK TRUE)
 
 ######################################################################
 ## Intel MKL: this MUST remain OPTIONAL
-#set(MKL_INTERFACE_FULL intel_lp64)
-#find_package(MKL CONFIG)
-#if (MKL_FOUND)
-#  set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
-#  add_compile_definitions(-DHAVE_MKL)
-#  add_compile_definitions(-DHAVE_LAPACK)
-#endif()
+set(MKL_INTERFACE_FULL intel_lp64)
+find_package(MKL CONFIG)
+if (MKL_FOUND)
+    set(LINK_LIBS ${LINK_LIBS} MKL::MKL)
+    add_compile_definitions(-DHAVE_MKL)
+    add_compile_definitions(-DHAVE_LAPACK)
+    set(TRY_OTHER_LAPACK FALSE)
+endif()
+
+######################################################################
+## LAPACK: this MUST remain OPTIONAL
+if (TRY_OTHER_LAPACK)
+    find_package(LAPACK)
+    if (LAPACK_FOUND)
+        set(LINK_LIBS ${LINK_LIBS} LAPACK::LAPACK)
+        add_definitions(-DHAVE_LAPACK)
+    endif()
+endif()
 
 #set(LINK_LIBS ${LINK_LIBS} "/opt/amd-biy/lib/libaocl.so")
 #add_compile_definitions(-DHAVE_LAPACK)
@@ -162,9 +164,13 @@ install(TARGETS frico
 install(FILES man/frico.1
     DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
-#install(DIRECTORY share/examples/
-#    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/examples
-#)
+install(DIRECTORY share/examples/
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/frico
+)
+
+install(DIRECTORY share/gnuplot/
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/frico
+)
 
 ######################################################################
 ## Packaging

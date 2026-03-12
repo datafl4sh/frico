@@ -27,6 +27,8 @@
 
 #include "lapack_wrappers.h"
 
+#ifdef HAVE_LAPACK
+
 extern "C" {
     void zgetrf_(int* m, int* n,
                  std::complex<double>* a, int* lda,
@@ -47,8 +49,6 @@ extern "C" {
                  const int* ipiv, std::complex<double>* b,
                  const int* ldb, int* info);
 }
-
-#ifdef HAVE_LAPACK
 
 bool solve_general(Eigen::MatrixXcd& A, const Eigen::VectorXcd& b,
     Eigen::VectorXcd& x)
