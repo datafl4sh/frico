@@ -53,7 +53,7 @@ following:
 
 ## Documentation
 
-The authoritative documentation for FRICO is its man page and it is located in the `man` directory in the source tree. If you installed FRICO in a system location, just say `man frico`, otherwise go to the `man` directory in the source tree and say `man ./frico.1`. An HTML version of the man page is available under `man`.
+The authoritative documentation for FRICO is its man page and it is located in the `man` directory in the source tree. If you installed FRICO in a system location, just say `man frico`, otherwise go to the `man` directory in the source tree and say `man ./frico.1`. HTML and PDF versions of the man page is available under `doc`.
 
 In `share/examples` you can find some usage examples of FRICO. Given that FRICO is a code in its early stages, you are encouraged to compare those examples with the results of other codes, like NEC or FEKO.
 
