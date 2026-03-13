@@ -4,6 +4,20 @@ The model for the half-wavelength dipole is contained in the file `dipole.geo`, 
 
     gmsh dipole.geo
 
+The dipole is modeled as a rectangular strip, as FRICO does not support thin wires yet.
+
+In order to run a frequency sweep from 250 MHz to 350 MHz at steps of 10 MHz you can launch
+
+    frico -g dipole.geo -R 250e6:10e6:350e6 -A -s src
+
+This will produce, as explained in the example for the biquad antenna:
+
+* 11 `default_N.silo` files with the fields at the different frequencies
+* 11 `polar_N.txt` files with the gain data at the different frequencies
+* the file `port_sweep.txt` with the impedance data at the input port
+
+## Comparison with NEC
+
 This example includes also a NEC file for the same dipole, configured for a frequency sweep from 250 MHz to 350 MHz at steps of 10 MHz. The NEC simulation can be run with `xnec2c` as
 
     xnec2c dipole.nec
