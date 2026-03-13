@@ -24,5 +24,10 @@ This example includes also a NEC file for the same dipole, configured for a freq
 
 On this example, FRICO and NEC should agree about the input parameters of the antenna (resistance and reactance) and the gain. At a frequency of 300 MHz you should observe an impedance of around 73 Ohm and a gain of about 2.15 dB. The dipole in this example is slightly shortened to remove the reactive part of the impedance.
 
+In the `comparison` subdirectory of this example you can find the comparison of the results from NEC and from FRICO. They can be plotted with
+
+    gnuplot --persist compare.plot
+
+
 ## References
 * Balanis 3rd Edition section 4.6.
