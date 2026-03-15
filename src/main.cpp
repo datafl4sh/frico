@@ -135,6 +135,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    #if 0
     if (not arg_source) {
         std::println(stderr, "No sources specified. Exiting.");
         return EXIT_FAILURE;
@@ -153,10 +154,14 @@ int main(int argc, char **argv)
     dg.phys_entity = pg.tag;
     dg.interfaces = pg.entityTags;
     dg.voltage = 1.0;
-
+    #endif
+    frico::plane_wave pw;
+    pw.E0_ = frico::edvec3{0.0, 1.0, 0.0};
+    pw.kinc_ = frico::edvec3{0.0, 0.0, 1.0};
 
     frico::maxwell::init_sweep(sim, *opt_freqs);
-    frico::maxwell::do_sweep(sim, dg);
+    //frico::maxwell::do_sweep(sim, dg);
+    frico::maxwell::do_sweep(sim, pw);
 
     return EXIT_SUCCESS;
 }

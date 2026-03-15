@@ -170,31 +170,8 @@ void write_file_headers(const simulation&, const plane_wave&);
 bool init_sweep(simulation&, const frequency_range&);
 
 
-template<typename Source>
-bool do_sweep(simulation& sim, const Source& src)
-{
-    write_file_headers(sim, src);
-    reorient_deltagap_edges(sim, src, sim.delta_gap_signs);
-
-    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
-        run_context(sim, ctx_num, src);
-        postpro_context(sim, ctx_num, src);
-
-        /* Dump matrices, if needed*/
-        if (sim.cfg.dump_matrices) {
-            const auto& context = sim.contexts[ctx_num];
-            std::string h5fn = "frico_" + std::to_string(ctx_num) + ".h5";
-            H5Easy::File file(h5fn, H5Easy::File::Truncate);
-            file.createDataSet("/frico/Z", context.Z);
-            file.createDataSet("/frico/V", context.V);
-        }
-
-        /* dealloc matrix when we're done */
-        sim.contexts[ctx_num].Z.resize(0,0);
-    }
-    return true;
-}
-
+bool do_sweep(simulation& sim, const delta_gap& src);
+bool do_sweep(simulation& sim, const plane_wave& src);
 
 
 } //namespace frico::maxwell

@@ -37,6 +37,9 @@
 
 #include "gmsh.h"
 
+#include "emw_postpro_common.h"
+#include "emw_postpro_delta_gap.h"
+
 namespace frico::maxwell {
 
 void
@@ -377,7 +380,44 @@ update_rhs(simulation& sim, size_t ctx_number, const delta_gap& dg)
 void
 update_rhs(simulation& sim, size_t ctx_number, const plane_wave& pw)
 {
+    auto& context = sim.contexts[ctx_number];
+    auto& msh = sim.msh;
 
+    point src{0.0, 0.0, -10.0};
+
+    double freq = context.frequency;
+    double omega = 2.0*M_PI*freq;
+    auto kk = omega*std::sqrt(MU0*EPS0);
+
+    for (const auto& ibf : sim.bfuncs) {
+
+        std::complex<double> v{0.0, 0.0};
+
+        const auto& iTminus = msh.triangles[ibf.itminus];
+        const auto& iTplus = msh.triangles[ibf.itplus];
+
+        auto wminus = 0.5*ibf.length/ibf.Aminus;
+        auto wplus = 0.5*ibf.length/ibf.Aplus;
+
+        auto mqps = integrate(msh, iTminus, sim.cfg.degree);
+        for (auto& qp : mqps) {
+            auto Rvec = qp.p - src;
+            auto k = Rvec.to_eigen().dot(pw.kinc_)*kk;
+            std::complex<double> jk{0.0, k};
+            v -= wminus * qp.w * ibf.rho_minus(qp.p).to_eigen().dot(pw.E0_)*std::exp(-jk);
+        }
+
+        auto pqps = integrate(msh, iTplus, sim.cfg.degree);
+        for (auto& qp : pqps) {
+            auto Rvec = qp.p - src;
+            auto k = Rvec.to_eigen().dot(pw.kinc_)*kk;
+            std::complex<double> jk{0.0, k};
+            v += wplus * qp.w * ibf.rho_plus(qp.p).to_eigen().dot(pw.E0_)*std::exp(-jk);
+        }
+
+        context.V(ibf.matrix_index) += v/(omega*MU0);
+                 
+    }
 }
 
 bool init_simulation(simulation& sim, const std::string& name,
@@ -435,8 +475,57 @@ bool init_sweep(simulation& sim, const frequency_range& freqs)
     return true;
 }
 
+bool do_sweep(simulation& sim, const delta_gap& src)
+{
+    write_file_headers(sim, src);
+    reorient_deltagap_edges(sim, src, sim.delta_gap_signs);
+
+    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
+        run_context(sim, ctx_num, src);
+        postpro_context(sim, ctx_num, src);
+
+        /* Dump matrices, if needed*/
+        if (sim.cfg.dump_matrices) {
+            const auto& context = sim.contexts[ctx_num];
+            std::string h5fn = "frico_" + std::to_string(ctx_num) + ".h5";
+            H5Easy::File file(h5fn, H5Easy::File::Truncate);
+            file.createDataSet("/frico/Z", context.Z);
+            file.createDataSet("/frico/V", context.V);
+        }
+
+        /* dealloc matrix when we're done */
+        sim.contexts[ctx_num].Z.resize(0,0);
+    }
+    return true;
+}
 
 
+void
+postpro_context(const simulation& sim, size_t ctx_num, const plane_wave& dg)
+{
+    write_fields(sim, ctx_num);
+}
+
+bool do_sweep(simulation& sim, const plane_wave& src)
+{
+    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
+        run_context(sim, ctx_num, src);
+        postpro_context(sim, ctx_num, src);
+
+        /* Dump matrices, if needed*/
+        if (sim.cfg.dump_matrices) {
+            const auto& context = sim.contexts[ctx_num];
+            std::string h5fn = "frico_" + std::to_string(ctx_num) + ".h5";
+            H5Easy::File file(h5fn, H5Easy::File::Truncate);
+            file.createDataSet("/frico/Z", context.Z);
+            file.createDataSet("/frico/V", context.V);
+        }
+
+        /* dealloc matrix when we're done */
+        sim.contexts[ctx_num].Z.resize(0,0);
+    }
+    return true;
+}
 
 
 
@@ -527,41 +616,7 @@ bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
 }
 */
 
-bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
-    double r, double h)
-{
-    gmsh::initialize();
-    gmsh::option::setNumber("General.Verbosity", 1);
 
-    gmsh::model::add("sampling");
-
-    //int tagxy = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
-    int tagyz = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
-    //int tagxz = gmsh::model::occ::addRectangle(c.x()-r, c.y()-r, c.z(), 2*r, 2*r);
-    gmsh::model::occ::rotate({{2, tagyz}},
-        c.x(), c.y(), c.z(), c.x(), c.y()+1, c.z(), M_PI/2 );
-    //gmsh::model::occ::rotate({{2, tagxz}},
-    //    c.x(), c.y(), c.z(), c.x()+1, c.y(), c.z(), M_PI/2 );
-
-    //gmsh::vectorpair out;
-    //std::vector<gmsh::vectorpair> outmap;
-    //gmsh::model::occ::fuse({ {2,tagxy}  }, {{2,tagyz}, {2,tagxz}}, out, outmap);
-
-    gmsh::model::occ::synchronize();
-
-    gmsh::vectorpair vp;
-    gmsh::model::getEntities(vp);
-    gmsh::model::mesh::setSize(vp, h);
-
-    gmsh::model::mesh::generate(2);
-    //gmsh::model::mesh::setOrder(1);
-
-    frico::load_from_gmsh(msh, frico::load_mode::quick);
-
-    gmsh::clear();
-    gmsh::finalize();
-    return true;
-}
 
 
 
@@ -631,6 +686,21 @@ void write_file_headers(const simulation&, const plane_wave&)
 
 void
 postpro_context(simulation& sim, size_t ctx_number, const plane_wave& pw)
-{}
+{
+    std::ofstream ofs("rcs.txt", std::ios::out | std::ios::app);
+    //auto [E, H] = eval_fields(sim, ctx_number, {0,0,-10});
+    //ofs << sim.contexts[ctx_number].frequency << " " << 4*M_PI*100*(E.norm()*E.norm()) << std::endl;
+
+
+    for (int i = 0; i < 359; i++) {
+        double deg2rad = M_PI/180.0;
+        double z = 10.0*std::sin(deg2rad*i);
+        double x = 10.0*std::cos(deg2rad*i);
+        auto [E, H] = eval_fields(sim, ctx_number, {x,0,z});
+        ofs << i << " " << 4*M_PI*100*(E.norm()*E.norm()) << std::endl;
+    }
+
+    //write_fields(sim, ctx_number);
+}
 
 }

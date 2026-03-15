@@ -31,6 +31,7 @@ std::complex<double> compute_reflection_coefficient(std::complex<double>, double
 double compute_swr(std::complex<double>, double);
 bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
     double r, double h);
-
+void
+write_fields(const simulation& sim, size_t ctx_number);
 }
 

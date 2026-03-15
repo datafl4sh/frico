@@ -159,42 +159,6 @@ compute_port_values(const simulation& sim,
     return ret;
 }
 
-void
-write_fields(const simulation& sim, size_t ctx_number)
-{
-    const auto& context = sim.contexts[ctx_number];
-
-    std::string filename =
-        sim.name + "_" + std::to_string(ctx_number) + ".silo";
-
-    ddfield normals = ddfield::Zero(sim.msh.triangles.size(), 3);
-    for (int i = 0; i < sim.msh.triangles.size(); i++) {
-        normals.row(i) = normal(sim.msh, sim.msh.triangles[i]);
-    }
-
-    silo db;
-    db.open(filename);
-    db.add_mesh("mesh", sim.msh);
-    db.add_variable("mesh", "J", context.tri_J, var_centering::zonal);
-    db.add_variable("mesh", "normals", normals, var_centering::zonal);
-
-    mesh smpmsh;
-    make_sampling_grid(smpmsh, {0,0,0}, 1, 0.01);
-    zdfield E = zdfield::Zero(smpmsh.vertices.size(), 3);
-    zdfield H = zdfield::Zero(smpmsh.vertices.size(), 3);
-    #pragma omp parallel for
-    for (int i = 0; i < smpmsh.vertices.size(); i++) {
-        const auto& pt = smpmsh.vertices[i];
-        auto [locE, locH] = eval_fields(sim, ctx_number, pt);
-        E.row(i) = locE;
-        H.row(i) = locH;
-    }
-
-    db.add_mesh("smpmesh", smpmsh);
-    db.add_variable("smpmesh", "E", E, var_centering::nodal);
-    db.add_variable("smpmesh", "H", H, var_centering::nodal);
-}
-
 void write_file_headers(const simulation& sim, const delta_gap& dg)
 {
     std::ofstream port_sweep_ofs("port_sweep.txt");
