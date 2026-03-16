@@ -21,22 +21,35 @@
 
 #pragma once
 
+#include <string>
 #include <expected>
 
-#include "eigen.h"
-#include "emw_solver.h"
+#include "geom_point.h"
+#include "geom_mesh.h"
 #include "utils.h"
 
-namespace frico::maxwell {
+namespace frico {
 
-std::pair<ezvec3, ezvec3> eval_fields(const simulation&, size_t, const point&);
-void eval_fields(const simulation&, size_t, const mesh&, zdfield&, zdfield&);
-std::complex<double> compute_reflection_coefficient(std::complex<double>, double);
-double compute_swr(std::complex<double>, double);
-bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
-    double r, double h);
-void write_fields(simulation& sim, size_t ctx_number);
+struct sampling_plane {
+    double  width;
+    double  height;
+    double  h;
+    vec3    normal;
+};
 
+struct sampling_plane_with_mesh {
+    std::string     name;
+    sampling_plane  plane;
+    mesh            smpmsh;
+};
+struct field_samplings {
+    std::vector<sampling_plane_with_mesh>   planes;
 
-} // namespace frico::maxwell
+};
 
+std::expected<sampling_plane, parse_error>
+parse_sampling_plane(const char *planespec);
+
+bool make_sampling_plane_mesh(frico::mesh& msh, const sampling_plane& sp);
+
+} // namespace frico

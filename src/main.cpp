@@ -35,7 +35,7 @@
 #include "constants.h"
 #include "emw_solver.h"
 #include "emw_postpro_delta_gap.h"
-#include "emw_postpro_common.h"
+#include "sampling_planes.h"
 
 int main(int argc, char **argv)
 {
@@ -153,13 +153,13 @@ int main(int argc, char **argv)
     /* Add field sampling planes */
     for (size_t i = 0; i < args_smp_planes.size(); i++) {
         const auto& p = args_smp_planes[i];
-        auto sp = frico::maxwell::parse_sampling_plane(p);
+        auto sp = frico::parse_sampling_plane(p);
         if (not sp.has_value()) {
             std::println(stderr, "Error parsing the argument of -P (occurrence {})", i+1);
             return EXIT_FAILURE;
         }
 
-        frico::maxwell::sampling_plane_with_mesh spwm;
+        frico::sampling_plane_with_mesh spwm;
         spwm.name = "plane_" + std::to_string(i);
         bool mesh_ok = make_sampling_plane_mesh(spwm.smpmsh, *sp);
         if (not mesh_ok) {

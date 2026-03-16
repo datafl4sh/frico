@@ -21,22 +21,11 @@
 
 #pragma once
 
-#include <expected>
-
-#include "eigen.h"
 #include "emw_solver.h"
-#include "utils.h"
-
+#include "emw_postpro_common.h"
 namespace frico::maxwell {
 
-std::pair<ezvec3, ezvec3> eval_fields(const simulation&, size_t, const point&);
-void eval_fields(const simulation&, size_t, const mesh&, zdfield&, zdfield&);
-std::complex<double> compute_reflection_coefficient(std::complex<double>, double);
-double compute_swr(std::complex<double>, double);
-bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
-    double r, double h);
-void write_fields(simulation& sim, size_t ctx_number);
-
+void postpro_context(simulation&, size_t, const plane_wave&);
+void write_file_headers(const simulation&, const plane_wave&);
 
 } // namespace frico::maxwell
-

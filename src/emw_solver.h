@@ -32,6 +32,8 @@
 #include "sources.h"
 #include "utils.h"
 #include "lapack_wrappers.h"
+#include "output_silo.h"
+#include "sampling_planes.h"
 
 namespace frico::maxwell {
 
@@ -61,21 +63,6 @@ enum class simulation_type {
     radar
 };
 
-struct sampling_plane {
-    double  width;
-    double  height;
-    double  h;
-    vec3    normal;
-};
-
-struct sampling_plane_with_mesh {
-    std::string     name;
-    sampling_plane  plane;
-    mesh            smpmsh;
-};
-struct field_samplings {
-    std::vector<sampling_plane_with_mesh>   planes;
-};
 
 struct simulation {
     std::string                     name;       // Simulation name
@@ -87,6 +74,7 @@ struct simulation {
     std::vector<freq_context>       contexts;   // Data for each frequency
     std::vector<double>             delta_gap_signs;
     field_samplings                 samplings;  // Requested field samplings
+    silo                            output_db;
 };
 
 bool init_simulation(simulation&, const std::string&,
@@ -177,15 +165,7 @@ bool run_context(simulation& sim, size_t ctx_number, const Source& src)
 }
 
 
-
-
-
-void postpro_context(simulation&, size_t, const plane_wave&);
-void write_file_headers(const simulation&, const plane_wave&);
-
-
 bool init_sweep(simulation&, const frequency_range&);
-
 
 bool do_sweep(simulation& sim, const delta_gap& src);
 bool do_sweep(simulation& sim, const plane_wave& src);

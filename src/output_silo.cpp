@@ -266,12 +266,16 @@ silo::add_variable(const std::string& mesh_name,
         return false;
     }
 
-
-    const char *names[] = { var_name.c_str() };
-    std::string def = "{" + vname_x + "," + vname_y + "," + vname_z + "}";
+    std::string dbcurdir = curdir().value();
+    std::string ename = dbcurdir + "/" + var_name;
+    const char *names[] = { ename.c_str() };
+    std::string def =  
+        "{<" + dbcurdir + "/" + vname_x + ">," +
+        "<" + dbcurdir + "/" + vname_y + ">," +
+        "<" + dbcurdir + "/" + vname_z + ">}";
     const char *defs[] = { def.c_str() };
     int types[] = { DB_VARTYPE_VECTOR };
-    std::string defname = var_name + "defs";
+    std::string defname = dbcurdir + var_name + "defs";
     if ( DBPutDefvars(db_, defname.c_str(), 1, names, types, defs, NULL) < 0) {
         return false;
     }

@@ -152,64 +152,28 @@ bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
     return true;
 }
 
-bool make_sampling_plane_mesh(frico::mesh& msh, const sampling_plane& sp)
-{
-    gmsh::initialize();
-    gmsh::option::setNumber("General.Verbosity", 1);
-
-    gmsh::model::add("sampling");
-
-    auto left = -sp.width/2.0;
-    auto bottom = -sp.height/2.0;
-
-    int tag = gmsh::model::occ::addRectangle(left, bottom, 0.0, sp.width, sp.height);
-
-    gmsh::model::occ::rotate({{2, tag}},
-        0.0, 0.0, 0.0, sp.normal.x(), sp.normal.y(), sp.normal.z(), M_PI/2 );
-
-    gmsh::model::occ::synchronize();
-
-    gmsh::vectorpair vp;
-    gmsh::model::getEntities(vp);
-    gmsh::model::mesh::setSize(vp, sp.h);
-
-    gmsh::model::mesh::generate(2);
-
-    frico::load_from_gmsh(msh, frico::load_mode::quick);
-
-    gmsh::clear();
-    gmsh::finalize();
-    return true;
-}
-
 void
-write_fields(const simulation& sim, size_t ctx_number)
+write_fields(simulation& sim, size_t ctx_number)
 {
     const auto& context = sim.contexts[ctx_number];
-
-    std::string filename =
-        sim.name + "_" + std::to_string(ctx_number) + ".silo";
 
     ddfield normals = ddfield::Zero(sim.msh.triangles.size(), 3);
     for (int i = 0; i < sim.msh.triangles.size(); i++) {
         normals.row(i) = normal(sim.msh, sim.msh.triangles[i]);
     }
 
-    silo db;
-    db.open(filename);
-    db.add_mesh("mesh", sim.msh);
+    auto& db = sim.output_db;
     
+    std::string old_dir = db.curdir().value();
+
     std::println("Postpro:\n  surface fields");
+    /* Output the surface currents */
     db.mkdir("surf_fields");
     db.chdir("surf_fields");
-    db.add_variable("mesh", "J", context.tri_J, var_centering::zonal);
-    db.chdir("/");
+    db.add_variable("/meshes/mesh", "J", context.tri_J, var_centering::zonal);
+    db.chdir(old_dir);
 
-    db.mkdir("debug");
-    db.chdir("debug");
-    db.add_variable("mesh", "normals", normals, var_centering::zonal);
-    db.chdir("/");
-
+    /* And process all the evaluation planes specified by the user */
     for (const auto& smp : sim.samplings.planes) {
         std::println("  fields on plane {}", smp.name);
         db.mkdir(smp.name);
@@ -225,12 +189,10 @@ write_fields(const simulation& sim, size_t ctx_number)
             H.row(i) = locH;
         }
 
-        std::string meshname = smp.name + "_mesh";
-
-        db.add_mesh(meshname, smpmsh);
+        std::string meshname = "/meshes/" + smp.name;
         db.add_variable(meshname, "E", E, var_centering::nodal);
         db.add_variable(meshname, "H", H, var_centering::nodal);
-        db.chdir("/");
+        db.chdir(old_dir);
     }
 }
 

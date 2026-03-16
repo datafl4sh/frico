@@ -203,7 +203,7 @@ postpro_context(const simulation& sim, size_t ctx_num, const delta_gap& dg)
     std::println("Max gain: {:.2f} dB", 10*std::log10(maxG));
     
     /* Fields */
-    write_fields(sim, ctx_num);
+    //write_fields(sim, ctx_num);
 }
 
 }
