@@ -152,6 +152,36 @@ bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
     return true;
 }
 
+bool make_sampling_plane_mesh(frico::mesh& msh, const sampling_plane& sp)
+{
+    gmsh::initialize();
+    gmsh::option::setNumber("General.Verbosity", 1);
+
+    gmsh::model::add("sampling");
+
+    auto left = -sp.width/2.0;
+    auto bottom = -sp.height/2.0;
+
+    int tag = gmsh::model::occ::addRectangle(left, bottom, 0.0, sp.width, sp.height);
+
+    gmsh::model::occ::rotate({{2, tag}},
+        0.0, 0.0, 0.0, sp.normal.x(), sp.normal.y(), sp.normal.z(), M_PI/2 );
+
+    gmsh::model::occ::synchronize();
+
+    gmsh::vectorpair vp;
+    gmsh::model::getEntities(vp);
+    gmsh::model::mesh::setSize(vp, sp.h);
+
+    gmsh::model::mesh::generate(2);
+
+    frico::load_from_gmsh(msh, frico::load_mode::quick);
+
+    gmsh::clear();
+    gmsh::finalize();
+    return true;
+}
+
 void
 write_fields(const simulation& sim, size_t ctx_number)
 {
@@ -168,24 +198,40 @@ write_fields(const simulation& sim, size_t ctx_number)
     silo db;
     db.open(filename);
     db.add_mesh("mesh", sim.msh);
+    
+    std::println("Postpro:\n  surface fields");
+    db.mkdir("surf_fields");
+    db.chdir("surf_fields");
     db.add_variable("mesh", "J", context.tri_J, var_centering::zonal);
+    db.chdir("/");
+
+    db.mkdir("debug");
+    db.chdir("debug");
     db.add_variable("mesh", "normals", normals, var_centering::zonal);
+    db.chdir("/");
 
-    mesh smpmsh;
-    make_sampling_grid(smpmsh, {0,0,0}, 1, 0.01);
-    zdfield E = zdfield::Zero(smpmsh.vertices.size(), 3);
-    zdfield H = zdfield::Zero(smpmsh.vertices.size(), 3);
-    #pragma omp parallel for
-    for (int i = 0; i < smpmsh.vertices.size(); i++) {
-        const auto& pt = smpmsh.vertices[i];
-        auto [locE, locH] = eval_fields(sim, ctx_number, pt);
-        E.row(i) = locE;
-        H.row(i) = locH;
+    for (const auto& smp : sim.samplings.planes) {
+        std::println("  fields on plane {}", smp.name);
+        db.mkdir(smp.name);
+        db.chdir(smp.name);
+        const auto& smpmsh = smp.smpmsh;
+        zdfield E = zdfield::Zero(smpmsh.vertices.size(), 3);
+        zdfield H = zdfield::Zero(smpmsh.vertices.size(), 3);
+        #pragma omp parallel for
+        for (int i = 0; i < smpmsh.vertices.size(); i++) {
+            const auto& pt = smpmsh.vertices[i];
+            auto [locE, locH] = eval_fields(sim, ctx_number, pt);
+            E.row(i) = locE;
+            H.row(i) = locH;
+        }
+
+        std::string meshname = smp.name + "_mesh";
+
+        db.add_mesh(meshname, smpmsh);
+        db.add_variable(meshname, "E", E, var_centering::nodal);
+        db.add_variable(meshname, "H", H, var_centering::nodal);
+        db.chdir("/");
     }
-
-    db.add_mesh("smpmesh", smpmsh);
-    db.add_variable("smpmesh", "E", E, var_centering::nodal);
-    db.add_variable("smpmesh", "H", H, var_centering::nodal);
 }
 
 }

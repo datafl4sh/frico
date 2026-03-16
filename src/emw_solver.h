@@ -61,6 +61,22 @@ enum class simulation_type {
     radar
 };
 
+struct sampling_plane {
+    double  width;
+    double  height;
+    double  h;
+    vec3    normal;
+};
+
+struct sampling_plane_with_mesh {
+    std::string     name;
+    sampling_plane  plane;
+    mesh            smpmsh;
+};
+struct field_samplings {
+    std::vector<sampling_plane_with_mesh>   planes;
+};
+
 struct simulation {
     std::string                     name;       // Simulation name
     simulation_type                 type;       // Type of simulation
@@ -70,6 +86,7 @@ struct simulation {
     std::vector<rwg_basis_function> bfuncs;     // Basis functions
     std::vector<freq_context>       contexts;   // Data for each frequency
     std::vector<double>             delta_gap_signs;
+    field_samplings                 samplings;  // Requested field samplings
 };
 
 bool init_simulation(simulation&, const std::string&,

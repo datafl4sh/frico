@@ -51,6 +51,24 @@ Physical Curve("source", 10) = {4,5,6,7};
 .in
 
 .TP
+\fB\-b\fR
+Bistatic Radar Cross Section computation.
+
+.TP
+\fB\-m\fR
+Monostatic Radar Cross Section computation.
+
+.TP
+\fB\-P <plane>:<width>:<height>:<meshsize>\fR \c
+.br
+\fB\-P <nx>:<ny>:<nz>:<width>:<height>:<meshsize>\fR
+Add a field evaluation plane.
+
+.TP
+\fB\-p <name>:<x>:<y>:<z>\fR
+Add a field probe.
+
+.TP
 \fB\-R <start>:<step>:<end>\fR
 Do a sweep from <start> Hz to <end> Hz at steps of <step> Hz. Frequencies may be
 specified using exponential notation. Mutually exclusive with -f.

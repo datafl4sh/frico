@@ -327,6 +327,38 @@ silo::add_curve(const std::string& name, const std::vector<double>& x,
     return true;
 }
 
+bool
+silo::mkdir(const std::string& name)
+{
+    if (not db_) {
+        return false;
+    }
+    DBMkDir(db_, name.c_str());
+    return true;
+}
+
+bool
+silo::chdir(const std::string& name)
+{
+    if (not db_) {
+        return false;
+    }
+    DBSetDir(db_, name.c_str());
+    return true;
+}
+
+std::optional<std::string>
+silo::curdir(void) const
+{
+    if (not db_) {
+        return {};
+    }
+
+    char dir[256];
+    DBGetDir(db_, dir);
+    return dir;
+}
+
 silo::~silo()
 {
     close();

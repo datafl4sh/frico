@@ -35,6 +35,7 @@
 #include "constants.h"
 #include "emw_solver.h"
 #include "emw_postpro_delta_gap.h"
+#include "emw_postpro_common.h"
 
 int main(int argc, char **argv)
 {
@@ -58,12 +59,17 @@ int main(int argc, char **argv)
     const char *arg_frequency = nullptr;
     const char *arg_range_expr = nullptr;
     const char *arg_simname = "default";
+    bool do_monostatic_rcs = false;
+    std::vector<const char *> args_smp_planes;
+    std::vector<const char *> args_probes;
 
     int opt;
-    while ((opt = getopt(argc, argv, "Adef:g:k:n:s:SR:x:vZ:")) != -1) {
+    while ((opt = getopt(argc, argv, "Ab:def:g:k:mn:P:p:s:SR:x:vZ:")) != -1) {
         switch (opt) {
         case 'A':
             sim.cfg.approx_matrix = true;
+            break;
+        case 'b':
             break;
         case 'd':
             sim.cfg.dump_matrices = true;
@@ -80,8 +86,17 @@ int main(int argc, char **argv)
         case 'k':
             sim.cfg.degree = std::stoull(optarg);
             break;
+        case 'm':
+            do_monostatic_rcs = true;
+            break;
         case 'n':
             arg_simname = optarg;
+            break;
+        case 'P':
+            args_smp_planes.push_back(optarg);
+            break;
+        case 'p':
+            args_probes.push_back(optarg);
             break;
         case 's':
             arg_source = optarg;
@@ -135,33 +150,53 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    #if 0
-    if (not arg_source) {
-        std::println(stderr, "No sources specified. Exiting.");
-        return EXIT_FAILURE;
+    /* Add field sampling planes */
+    for (size_t i = 0; i < args_smp_planes.size(); i++) {
+        const auto& p = args_smp_planes[i];
+        auto sp = frico::maxwell::parse_sampling_plane(p);
+        if (not sp.has_value()) {
+            std::println(stderr, "Error parsing the argument of -P (occurrence {})", i+1);
+            return EXIT_FAILURE;
+        }
+
+        frico::maxwell::sampling_plane_with_mesh spwm;
+        spwm.name = "plane_" + std::to_string(i);
+        bool mesh_ok = make_sampling_plane_mesh(spwm.smpmsh, *sp);
+        if (not mesh_ok) {
+            return EXIT_FAILURE;
+        }
+
+        sim.samplings.planes.push_back( std::move(spwm) );
     }
 
-    const auto& pgs = sim.msh.physgroups;
-    if ( pgs.find(arg_source) == pgs.end() ) {
-        std::println(stderr, 
-            "Unknown physical group \"{}\": cannot enable source",
-            arg_source);
-        return EXIT_FAILURE;
-    }
-    const auto& pg = sim.msh.physgroups[arg_source];
-    frico::delta_gap dg;
-    dg.name = pg.name;
-    dg.phys_entity = pg.tag;
-    dg.interfaces = pg.entityTags;
-    dg.voltage = 1.0;
-    #endif
-    frico::plane_wave pw;
-    pw.E0_ = frico::edvec3{0.0, 1.0, 0.0};
-    pw.kinc_ = frico::edvec3{0.0, 0.0, 1.0};
+    if (arg_source) {
+        const auto& pgs = sim.msh.physgroups;
+        if ( pgs.find(arg_source) == pgs.end() ) {
+            std::println(stderr, 
+                "Unknown physical group \"{}\": cannot enable source",
+                arg_source);
+            return EXIT_FAILURE;
+        }
+        const auto& pg = sim.msh.physgroups[arg_source];
+        frico::delta_gap dg;
+        dg.name = pg.name;
+        dg.phys_entity = pg.tag;
+        dg.interfaces = pg.entityTags;
+        dg.voltage = 1.0;
 
-    frico::maxwell::init_sweep(sim, *opt_freqs);
-    //frico::maxwell::do_sweep(sim, dg);
-    frico::maxwell::do_sweep(sim, pw);
+        frico::maxwell::init_sweep(sim, *opt_freqs);
+        frico::maxwell::do_sweep(sim, dg);
+    }
+
+    if (do_monostatic_rcs) {
+        frico::plane_wave pw;
+        pw.E0 = frico::edvec3{0.0, 1.0, 0.0};
+        pw.dir = frico::edvec3{0.0, 0.0, 1.0};
+        pw.srcpos = frico::point{0.0, 0.0, -10.0};
+
+        frico::maxwell::init_sweep(sim, *opt_freqs);
+        frico::maxwell::do_sweep(sim, pw);
+    }
 
     return EXIT_SUCCESS;
 }

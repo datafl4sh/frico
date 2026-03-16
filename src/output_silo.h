@@ -87,6 +87,10 @@ public:
         const std::vector<double>& y
     );
 
+    bool mkdir(const std::string& name);
+    bool chdir(const std::string& name);
+    std::optional<std::string> curdir(void) const;
+
     ~silo();
 };
 

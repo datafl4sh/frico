@@ -383,7 +383,7 @@ update_rhs(simulation& sim, size_t ctx_number, const plane_wave& pw)
     auto& context = sim.contexts[ctx_number];
     auto& msh = sim.msh;
 
-    point src{0.0, 0.0, -10.0};
+    auto propdir = pw.dir/pw.dir.norm();
 
     double freq = context.frequency;
     double omega = 2.0*M_PI*freq;
@@ -401,22 +401,21 @@ update_rhs(simulation& sim, size_t ctx_number, const plane_wave& pw)
 
         auto mqps = integrate(msh, iTminus, sim.cfg.degree);
         for (auto& qp : mqps) {
-            auto Rvec = qp.p - src;
-            auto k = Rvec.to_eigen().dot(pw.kinc_)*kk;
+            auto Rvec = qp.p - pw.srcpos;
+            auto k = Rvec.to_eigen().dot(propdir)*kk;
             std::complex<double> jk{0.0, k};
-            v -= wminus * qp.w * ibf.rho_minus(qp.p).to_eigen().dot(pw.E0_)*std::exp(-jk);
+            v -= wminus * qp.w * ibf.rho_minus(qp.p).to_eigen().dot(pw.E0)*std::exp(-jk);
         }
 
         auto pqps = integrate(msh, iTplus, sim.cfg.degree);
         for (auto& qp : pqps) {
-            auto Rvec = qp.p - src;
-            auto k = Rvec.to_eigen().dot(pw.kinc_)*kk;
+            auto Rvec = qp.p - pw.srcpos;
+            auto k = Rvec.to_eigen().dot(propdir)*kk;
             std::complex<double> jk{0.0, k};
-            v += wplus * qp.w * ibf.rho_plus(qp.p).to_eigen().dot(pw.E0_)*std::exp(-jk);
+            v += wplus * qp.w * ibf.rho_plus(qp.p).to_eigen().dot(pw.E0)*std::exp(-jk);
         }
 
-        context.V(ibf.matrix_index) += v/(omega*MU0);
-                 
+        context.V(ibf.matrix_index) += v/std::complex<double>{0, -omega*MU0};        
     }
 }
 
@@ -694,13 +693,24 @@ postpro_context(simulation& sim, size_t ctx_number, const plane_wave& pw)
 
     for (int i = 0; i < 359; i++) {
         double deg2rad = M_PI/180.0;
-        double z = 10.0*std::sin(deg2rad*i);
-        double x = 10.0*std::cos(deg2rad*i);
+        double x = -10.0*std::sin(deg2rad*i);
+        double z = -10.0*std::cos(deg2rad*i);
         auto [E, H] = eval_fields(sim, ctx_number, {x,0,z});
-        ofs << i << " " << 4*M_PI*100*(E.norm()*E.norm()) << std::endl;
+
+        auto xnorm = std::abs( E(0)*std::conj(E(0)) );
+        auto ynorm = std::abs( E(1)*std::conj(E(1)) );
+        auto znorm = std::abs( E(2)*std::conj(E(2)) );
+
+        ezvec3 Ey{0.0, 1.0, 0.0};
+
+        ofs << i << " " << 4*M_PI*100*( std::abs(E.dot(E)) )  << " ";
+        ofs << 4*M_PI*100*xnorm << " ";
+        ofs << 4*M_PI*100*ynorm << " ";
+        ofs << 4*M_PI*100*znorm << " ";
+        ofs << std::endl;
     }
 
-    //write_fields(sim, ctx_number);
+    write_fields(sim, ctx_number);
 }
 
 }

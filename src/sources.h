@@ -32,8 +32,9 @@ namespace frico {
 
 /**************************************************************/
 struct plane_wave {
-    edvec3 E0_;
-    edvec3 kinc_;
+    edvec3  E0;         // Electric field intensity
+    edvec3  dir;        // Propagation direction
+    point   srcpos;     // Position of the source
 };
 
 /**************************************************************/
