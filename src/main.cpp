@@ -189,10 +189,8 @@ int main(int argc, char **argv)
     }
 
     if (do_monostatic_rcs) {
-        frico::plane_wave pw;
-        pw.E0 = frico::edvec3{0.0, 1.0, 0.0};
-        pw.dir = frico::edvec3{0.0, 0.0, 1.0};
-        pw.srcpos = frico::point{0.0, 0.0, -10.0};
+        auto deg2rad = M_PI/180.0;
+        frico::plane_wave pw(deg2rad*0.0, 0.0, 1.0, 1.0);
 
         frico::maxwell::init_sweep(sim, *opt_freqs);
         frico::maxwell::do_sweep(sim, pw);

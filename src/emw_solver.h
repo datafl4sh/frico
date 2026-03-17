@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <fstream>
 #include <print>
 #include <chrono>
 
@@ -75,6 +76,19 @@ struct simulation {
     std::vector<double>             delta_gap_signs;
     field_samplings                 samplings;  // Requested field samplings
     silo                            output_db;
+};
+
+struct antenna_analysis {
+
+};
+struct monostatic_rcs_analysis {
+
+};
+struct bistatic_rcs_analysis {
+    double          radar_R;
+    double          radar_theta;
+    double          radar_phi;
+    std::ofstream   ofs;
 };
 
 bool init_simulation(simulation&, const std::string&,

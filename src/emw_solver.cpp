@@ -384,11 +384,9 @@ update_rhs(simulation& sim, size_t ctx_number, const plane_wave& pw)
     auto& context = sim.contexts[ctx_number];
     auto& msh = sim.msh;
 
-    auto propdir = pw.dir/pw.dir.norm();
-
     double freq = context.frequency;
     double omega = 2.0*M_PI*freq;
-    auto kk = omega*std::sqrt(MU0*EPS0);
+    auto k = omega*std::sqrt(MU0*EPS0);
 
     for (const auto& ibf : sim.bfuncs) {
 
@@ -402,20 +400,16 @@ update_rhs(simulation& sim, size_t ctx_number, const plane_wave& pw)
 
         auto mqps = integrate(msh, iTminus, sim.cfg.degree);
         for (auto& qp : mqps) {
-            auto Rvec = qp.p - pw.srcpos;
-            auto k = Rvec.to_eigen().dot(propdir)*kk;
-            std::complex<double> jk{0.0, k};
+            ezvec3 E = pw.compute(k, qp.p);
             v -= wminus * qp.w *
-                ibf.rho_minus(qp.p).to_eigen().dot(pw.E0)*std::exp(-jk);
+                ibf.rho_minus(qp.p).to_eigen().dot(E);
         }
 
         auto pqps = integrate(msh, iTplus, sim.cfg.degree);
         for (auto& qp : pqps) {
-            auto Rvec = qp.p - pw.srcpos;
-            auto k = Rvec.to_eigen().dot(propdir)*kk;
-            std::complex<double> jk{0.0, k};
+            ezvec3 E = pw.compute(k, qp.p);
             v += wplus * qp.w *
-                ibf.rho_plus(qp.p).to_eigen().dot(pw.E0)*std::exp(-jk);
+                ibf.rho_plus(qp.p).to_eigen().dot(E);
         }
 
         context.V(ibf.matrix_index) += v/std::complex<double>{0, -omega*MU0};        

@@ -26,6 +26,7 @@
 #include <expected>
 #include <optional>
 
+#include "geom_point.h"
 namespace frico {
 
 struct frequency_range {
@@ -49,5 +50,14 @@ std::expected<std::vector<int>, parse_error>
 
 std::optional<frico::frequency_range>
     parse_frequency_parameters(const char *, const char *);
+
+inline point
+sph2rect(double R, double theta, double phi)
+{
+    auto x = R * std::cos(phi) * std::sin(theta);
+    auto y = R * std::sin(phi) * std::sin(theta);
+    auto z = R * std::cos(theta);
+    return {x,y,z};
+}
 
 } // namespace frico

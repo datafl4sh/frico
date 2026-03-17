@@ -35,6 +35,31 @@ void write_file_headers(const simulation&, const plane_wave&)
     
 }
 
+
+
+std::pair<double, double>
+bistatic_RCS_unit_Ei(const ezvec3& Es, double theta_s, double phi_s, double R)
+{
+    ezvec3 theta_hat_s {
+        std::cos(theta_s)*std::cos(phi_s),
+        std::cos(theta_s)*std::sin(phi_s),
+        -std::sin(theta_s) };
+
+    ezvec3 phi_hat_s {
+        -std::sin(phi_s),
+        std::cos(phi_s),
+        0.0 };
+
+    std::complex<double> E_theta_s = theta_hat_s.dot(Es);
+    std::complex<double> E_phi_s = phi_hat_s.dot(Es);
+
+    double sigma_VV = 4.0 * M_PI * R * R * std::norm(E_theta_s);
+    double sigma_HH = 4.0 * M_PI * R * R * std::norm(E_phi_s);
+
+    return {sigma_VV, sigma_HH};
+}
+
+
 void
 postpro_context(simulation& sim, size_t ctx_num, const plane_wave& pw)
 {
@@ -46,7 +71,7 @@ postpro_context(simulation& sim, size_t ctx_num, const plane_wave& pw)
     sim.output_db.chdir(old_dir);
 
     std::ofstream ofsm("monostatic_rcs.txt", std::ios::out | std::ios::app);
-    auto [E, H] = eval_fields(sim, ctx_num, {0,0,-10});
+    auto [E, H] = eval_fields(sim, ctx_num, {0,0,10});
     ofsm << sim.contexts[ctx_num].frequency << " " << 4*M_PI*100*(E.norm()*E.norm()) << std::endl;
 
     std::string fname = "bistatic_rcs_" + std::to_string(ctx_num) + ".txt";
@@ -55,13 +80,16 @@ postpro_context(simulation& sim, size_t ctx_num, const plane_wave& pw)
     ofsb << "# FRICO bistatic RCS computation" << std::endl;
     for (int i = 0; i < 359; i++) {
         double deg2rad = M_PI/180.0;
-        double x = -10.0*std::sin(deg2rad*i);
-        double z = -10.0*std::cos(deg2rad*i);
-        auto [E, H] = eval_fields(sim, ctx_num, {x,0,z});
+        
+        auto p_el = sph2rect(10.0, deg2rad*i, 0.0);
+        auto [Es_el, Hs_el] = eval_fields(sim, ctx_num, p_el);
+        auto [VV_el, HH_el] = bistatic_RCS_unit_Ei(Es_el, deg2rad*i, 0.0, 10.0);
 
-        auto rcs = 4*M_PI*100*( std::abs(E.dot(E)) );
+        auto p_az = sph2rect(10.0, 0.0, deg2rad*i);
+        auto [Es_az, Hs_az] = eval_fields(sim, ctx_num, p_az);
+        auto [VV_az, HH_az] = bistatic_RCS_unit_Ei(Es_el, 0.0, deg2rad*i, 10.0);
 
-        ofsb << i << " " <<  x << " " << z << " " << rcs << std::endl;
+        std::println(ofsb, "{} {} {} {} {}", i, VV_el, HH_el, VV_az, HH_az);
     }
 
 }
