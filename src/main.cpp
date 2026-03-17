@@ -36,6 +36,7 @@
 #include "emw_solver.h"
 #include "emw_postpro_delta_gap.h"
 #include "sampling_planes.h"
+#include "emw_ana_bistatic_rcs.h"
 
 int main(int argc, char **argv)
 {
@@ -59,6 +60,7 @@ int main(int argc, char **argv)
     const char *arg_frequency = nullptr;
     const char *arg_range_expr = nullptr;
     const char *arg_simname = "default";
+    const char *arg_bistatic = nullptr;
     bool do_monostatic_rcs = false;
     std::vector<const char *> args_smp_planes;
     std::vector<const char *> args_probes;
@@ -70,6 +72,7 @@ int main(int argc, char **argv)
             sim.cfg.approx_matrix = true;
             break;
         case 'b':
+            arg_bistatic = optarg;
             break;
         case 'd':
             sim.cfg.dump_matrices = true;
@@ -194,6 +197,15 @@ int main(int argc, char **argv)
 
         frico::maxwell::init_sweep(sim, *opt_freqs);
         frico::maxwell::do_sweep(sim, pw);
+    }
+
+    if (arg_bistatic) {
+        frico::maxwell::bistatic_rcs_analysis brcsa;
+        if (not frico::maxwell::init_from_spec(arg_bistatic, brcsa)) {
+            return EXIT_FAILURE;
+        }
+        frico::maxwell::init_sweep(sim, *opt_freqs);
+        frico::maxwell::do_sweep(sim, brcsa);
     }
 
     return EXIT_SUCCESS;

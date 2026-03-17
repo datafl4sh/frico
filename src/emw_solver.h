@@ -84,12 +84,6 @@ struct antenna_analysis {
 struct monostatic_rcs_analysis {
 
 };
-struct bistatic_rcs_analysis {
-    double          radar_R;
-    double          radar_theta;
-    double          radar_phi;
-    std::ofstream   ofs;
-};
 
 bool init_simulation(simulation&, const std::string&,
     const std::string&);
