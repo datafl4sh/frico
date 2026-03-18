@@ -34,8 +34,8 @@
 #include "sources.h"
 #include "constants.h"
 #include "emw_solver.h"
-#include "emw_postpro_delta_gap.h"
 #include "sampling_planes.h"
+#include "emw_ana_antenna.h"
 #include "emw_ana_bistatic_rcs.h"
 
 int main(int argc, char **argv)
@@ -180,15 +180,19 @@ int main(int argc, char **argv)
                 arg_source);
             return EXIT_FAILURE;
         }
+
+        frico::maxwell::antenna_analysis anta;
+
         const auto& pg = sim.msh.physgroups[arg_source];
-        frico::delta_gap dg;
-        dg.name = pg.name;
-        dg.phys_entity = pg.tag;
-        dg.interfaces = pg.entityTags;
-        dg.voltage = 1.0;
+        anta.dgap.name = pg.name;
+        anta.dgap.phys_entity = pg.tag;
+        anta.dgap.interfaces = pg.entityTags;
+        anta.dgap.voltage = 1.0;
+        anta.Z0 = 50;
+        anta.rdiag_dist = 10;
 
         frico::maxwell::init_sweep(sim, *opt_freqs);
-        frico::maxwell::do_sweep(sim, dg);
+        frico::maxwell::do_sweep(sim, anta);
     }
 
     if (do_monostatic_rcs) {

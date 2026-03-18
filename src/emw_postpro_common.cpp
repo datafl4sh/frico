@@ -97,7 +97,7 @@ void eval_fields(const simulation& sim, size_t ctx_number,
  * @return std::complex<double> 
  */
 std::complex<double>
-compute_reflection_coefficient(std::complex<double> Z, double Z0)
+gamma(std::complex<double> Z, double Z0)
 {
     return (Z - Z0)/(Z + Z0);
 }
@@ -110,9 +110,15 @@ compute_reflection_coefficient(std::complex<double> Z, double Z0)
  * @return double 
  */
 double
-compute_swr(std::complex<double> Z, double Z0)
+swr(std::complex<double> Z, double Z0)
 {
     std::complex<double> gamma = (Z - Z0)/(Z + Z0);
+    return (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
+}
+
+double
+swr(std::complex<double> gamma)
+{
     return (1.0 + std::abs(gamma))/(1.0 - std::abs(gamma));
 }
 

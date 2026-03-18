@@ -31,7 +31,7 @@
 namespace frico {
 
 /**************************************************************/
-struct plane_wave {
+class plane_wave {
     using cd = std::complex<double>;
 
     edvec3  theta_hat;  // Theta unit vector (vertical)
@@ -40,6 +40,7 @@ struct plane_wave {
     cd      Etheta;
     cd      Ephi;
 
+public:
     plane_wave(double theta_i, double phi_i, cd Etheta_i, cd Ephi_i)
     {
         /* Compute the vector FROM the origin */

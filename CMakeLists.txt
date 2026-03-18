@@ -149,9 +149,10 @@ endif()
 set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
             src/output_silo.cpp src/quadratures.cpp src/rwg_basis.cpp
             src/utils.cpp src/sources.cpp src/emw_solver.cpp
-            src/emw_postpro_delta_gap.cpp src/emw_postpro_common.cpp
+            src/emw_postpro_common.cpp
             src/lapack_wrappers.cpp src/sampling_planes.cpp
             src/emw_postpro_rcs.cpp src/emw_ana_bistatic_rcs.cpp
+            src/emw_ana_antenna.cpp
 )
 
 add_executable(frico ${SOURCES})

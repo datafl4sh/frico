@@ -59,15 +59,8 @@ struct freq_context {
     zdvector                    tri_AdivJ;
 };
 
-enum class simulation_type {
-    antenna,
-    radar
-};
-
-
 struct simulation {
     std::string                     name;       // Simulation name
-    simulation_type                 type;       // Type of simulation
     config                          cfg;        // Simulation config
     mesh                            msh;        // Mesh
     std::vector<int>                skiptags;   // Surfaces to skip
@@ -78,9 +71,7 @@ struct simulation {
     silo                            output_db;
 };
 
-struct antenna_analysis {
 
-};
 struct monostatic_rcs_analysis {
 
 };
