@@ -45,8 +45,8 @@ init_from_spec(const char *spec, bistatic_rcs_analysis& ana)
         ana.radar_phi = deg2rad*std::stod(toks[2]);
 
         if (toks.size() == 5) {
-            ana.Etheta = std::stod(toks[4]);
-            ana.Ephi = std::stod(toks[5]);
+            ana.Etheta = std::stod(toks[3]);
+            ana.Ephi = std::stod(toks[4]);
         }
     }
     catch (...)
