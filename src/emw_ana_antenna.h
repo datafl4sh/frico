@@ -45,7 +45,6 @@ struct antenna_data {
 struct antenna_analysis {
     delta_gap   dgap;           /* delta-gap excitation */
     double      rdiag_dist;     /* distance for radiation diag computation */
-    double      Z0;             /* system impedance for SWR computation */
     std::vector<antenna_data>   antdata;
 };
 

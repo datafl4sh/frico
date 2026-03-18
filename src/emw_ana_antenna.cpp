@@ -100,7 +100,7 @@ compute_port_values(const simulation& sim,
     
     antdata.port.voltage = anta.dgap.voltage;
     antdata.port.impedance = anta.dgap.voltage/antdata.port.current;
-    antdata.port.gamma = gamma(antdata.port.impedance, anta.Z0);
+    antdata.port.gamma = gamma(antdata.port.impedance, sim.cfg.Z0);
     antdata.port.swr = swr(antdata.port.gamma);
 }
 
@@ -205,7 +205,7 @@ write_hdf5(const std::string& filename, const simulation& sim,
     H5Easy::File file(filename, H5Easy::File::Truncate);
     file.createDataSet(basepath+"rdiag_dist", anta.rdiag_dist);
     file.createDataSet(basepath + "sweep_steps", nctxs);
-    file.createDataSet(basepath + "Z0", anta.Z0);
+    file.createDataSet(basepath + "Z0", sim.cfg.Z0);
     for (size_t ctx_num = 0; ctx_num < nctxs; ctx_num++) {
         const auto& context = sim.contexts[ctx_num];
         const auto& antdata = anta.antdata[ctx_num];

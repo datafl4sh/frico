@@ -159,7 +159,7 @@ bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
 }
 
 void
-write_fields(simulation& sim, size_t ctx_number)
+write_fields(simulation& sim, size_t ctx_number, silo& db)
 {
     const auto& context = sim.contexts[ctx_number];
 
@@ -167,8 +167,6 @@ write_fields(simulation& sim, size_t ctx_number)
     for (int i = 0; i < sim.msh.triangles.size(); i++) {
         normals.row(i) = normal(sim.msh, sim.msh.triangles[i]);
     }
-
-    auto& db = sim.output_db;
     
     std::string old_dir = db.curdir().value();
 

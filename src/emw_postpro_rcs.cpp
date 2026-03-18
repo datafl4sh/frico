@@ -63,6 +63,7 @@ bistatic_RCS_unit_Ei(const ezvec3& Es, double theta_s, double phi_s, double R)
 void
 postpro_context(simulation& sim, size_t ctx_num, const plane_wave& pw)
 {
+    #if 0
     std::string dirname = "sweep_step_" + std::to_string(ctx_num);
     auto old_dir = sim.output_db.curdir().value();
     sim.output_db.mkdir(dirname);
@@ -91,6 +92,7 @@ postpro_context(simulation& sim, size_t ctx_num, const plane_wave& pw)
 
         std::println(ofsb, "{} {} {} {} {}", i, VV_el, HH_el, VV_az, HH_az);
     }
+    #endif
 
 }
 

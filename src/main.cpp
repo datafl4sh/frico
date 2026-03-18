@@ -66,7 +66,7 @@ int main(int argc, char **argv)
     std::vector<const char *> args_probes;
 
     int opt;
-    while ((opt = getopt(argc, argv, "Ab:def:g:k:mn:P:p:s:SR:x:vZ:")) != -1) {
+    while ((opt = getopt(argc, argv, "Ab:def:g:k:mn:O:o:P:p:R:s:Stx:vZ:")) != -1) {
         switch (opt) {
         case 'A':
             sim.cfg.approx_matrix = true;
@@ -90,10 +90,15 @@ int main(int argc, char **argv)
             sim.cfg.degree = std::stoull(optarg);
             break;
         case 'm':
-            do_monostatic_rcs = true;
             break;
         case 'n':
             arg_simname = optarg;
+            break;
+        case 'O':
+            sim.cfg.h5_outfn = optarg;
+            break;
+        case 'o':
+            sim.cfg.silo_outfn = optarg;
             break;
         case 'P':
             args_smp_planes.push_back(optarg);
@@ -101,14 +106,16 @@ int main(int argc, char **argv)
         case 'p':
             args_probes.push_back(optarg);
             break;
+        case 'R':
+            arg_range_expr = optarg;
+            break;
         case 's':
             arg_source = optarg;
             break;
         case 'S':
             sim.cfg.force_symmetry = true;
             break;
-        case 'R':
-            arg_range_expr = optarg;
+        case 't':
             break;
         case 'v':
             sim.cfg.verbose = true;
@@ -188,7 +195,6 @@ int main(int argc, char **argv)
         anta.dgap.phys_entity = pg.tag;
         anta.dgap.interfaces = pg.entityTags;
         anta.dgap.voltage = 1.0;
-        anta.Z0 = 50;
         anta.rdiag_dist = 10;
 
         frico::maxwell::init_sweep(sim, *opt_freqs);

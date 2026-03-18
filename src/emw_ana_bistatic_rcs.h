@@ -24,17 +24,24 @@
 #include <fstream>
 #include "emw_solver.h"
 namespace frico::maxwell {
+
+struct bistatic_rcs_data {
+    std::vector<double>     VV_theta;
+    std::vector<double>     HH_theta;
+    std::vector<double>     VV_phi;
+    std::vector<double>     HH_phi;
+};
+
 struct bistatic_rcs_analysis {
     double          radar_R = 10.0;
     double          radar_theta = 0.0;
     double          radar_phi = 0.0;
     double          Etheta = 1.0;
     double          Ephi = 1.0;
-    std::ofstream   ofs;
+    std::vector<bistatic_rcs_data>  rcsdata;
 };
 
 bool init_from_spec(const char *spec, bistatic_rcs_analysis& ana);
-
 bool do_sweep(simulation& sim, const bistatic_rcs_analysis& ana);
 
 } // namespace frico::maxwell

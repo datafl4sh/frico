@@ -475,6 +475,7 @@ bool init_sweep(simulation& sim, const frequency_range& freqs)
 
 bool do_sweep(simulation& sim, const plane_wave& src)
 {
+    #if 0
     sim.output_db.open("frico.silo");
     
     sim.output_db.mkdir("meshes");
@@ -503,6 +504,7 @@ bool do_sweep(simulation& sim, const plane_wave& src)
     }
 
     sim.output_db.close();
+    #endif
     return true;
 }
 

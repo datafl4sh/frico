@@ -161,8 +161,24 @@ Expert stuff: In the current implementation the matrix is slightly nonsymmetric
 This flag forces symmetrization by doing 0.5*(Z + Z^T). Do not use.
 
 .\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-.SS Misc options
+.SS Output options
 
+.\"%%%
+.TP
+\fB\-O <filename>\fR
+Enable HDF5 output and write the fields in the file named \fBfilename\fR.
+
+.\"%%%
+.TP
+\fB\-o <filename>\fR
+Enable Silo output and write the fields in the file named \fBfilename\fR.
+
+.\"%%%
+.TP
+\fB\-t\fR
+Enable textual output.
+
+.\"%%%
 .TP
 \fB\-n <name>\fR
 Set a descriptive name for the simulation. Default is "default".

@@ -83,14 +83,16 @@ bistatic_RCS_unit_Ei(const ezvec3& Es, double theta_s, double phi_s, double R)
 
 static void
 postpro_context(simulation& sim, size_t ctx_num,
-    const bistatic_rcs_analysis& ana)
+    const bistatic_rcs_analysis& ana, silo& db)
 {
-    std::string dirname = "sweep_step_" + std::to_string(ctx_num);
-    auto old_dir = sim.output_db.curdir().value();
-    sim.output_db.mkdir(dirname);
-    sim.output_db.chdir(dirname);
-    write_fields(sim, ctx_num);
-    sim.output_db.chdir(old_dir);
+    if ( db.is_open() ) {
+        std::string dirname = "sweep_step_" + std::to_string(ctx_num);
+        auto old_dir = db.curdir().value();
+        db.mkdir(dirname);
+        db.chdir(dirname);
+        write_fields(sim, ctx_num, db);
+        db.chdir(old_dir);
+    }
 
     std::string fname = "bistatic_rcs_" + std::to_string(ctx_num) + ".txt";
 
@@ -118,27 +120,33 @@ postpro_context(simulation& sim, size_t ctx_num,
 bool
 do_sweep(simulation& sim, const bistatic_rcs_analysis& ana)
 {
-    sim.output_db.open("frico.silo");
+    silo db;
+    if (sim.cfg.silo_outfn) {
+        db.open(sim.cfg.silo_outfn);
+        db.mkdir("meshes");
+        db.chdir("meshes");
+        db.add_mesh("mesh", sim.msh);
     
-    sim.output_db.mkdir("meshes");
-    sim.output_db.chdir("meshes");
-    sim.output_db.add_mesh("mesh", sim.msh);
-    for (const auto& smp : sim.samplings.planes) {
-        sim.output_db.add_mesh(smp.name, smp.smpmsh);
+        for (const auto& smp : sim.samplings.planes) {
+            db.add_mesh(smp.name, smp.smpmsh);
+        }
+        db.chdir("/");
     }
-    sim.output_db.chdir("/");
 
     plane_wave pw(ana.radar_theta, ana.radar_phi, ana.Etheta, ana.Ephi);
 
     for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
         run_context(sim, ctx_num, pw);
-        postpro_context(sim, ctx_num, ana);
+        postpro_context(sim, ctx_num, ana, db);
 
         /* dealloc matrix when we're done */
         sim.contexts[ctx_num].Z.resize(0,0);
     }
 
-    sim.output_db.close();
+    if ( db.is_open() ) {
+        db.close();
+    }
+
     return true;
 }
 

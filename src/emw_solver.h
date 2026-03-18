@@ -47,6 +47,8 @@ struct config
     bool            force_reorient_deltagap = false;
     bool            verbose = false;
     double          Z0 = 50.0;
+    const char *    silo_outfn = nullptr;
+    const char *    h5_outfn = nullptr;
 };
 struct freq_context {
     size_t                      ctx_number; // Incremental context number
@@ -68,7 +70,6 @@ struct simulation {
     std::vector<freq_context>       contexts;   // Data for each frequency
     std::vector<double>             delta_gap_signs;
     field_samplings                 samplings;  // Requested field samplings
-    silo                            output_db;
 };
 
 
