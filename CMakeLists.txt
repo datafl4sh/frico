@@ -133,6 +133,13 @@ endif()
 #set(LINK_LIBS ${LINK_LIBS} "/opt/amd-biy/lib/libaocl.so")
 #add_compile_definitions(-DHAVE_LAPACK)
 
+######################################################################
+## Qt: the GUI ***MUST*** remain optional. All the FRICO capabilities
+## have to be usable from the command line driver
+find_package(Qt6 COMPONENTS Widgets Charts)
+if (Qt6_FOUND)
+    set(BUILD_FRICO_GUI TRUE)
+endif()
 
 ######################################################################
 ## Sources and targets
@@ -146,7 +153,7 @@ if (OPT_ENABLE_OPENMP)
 endif()
 
 
-set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
+set(LIBFRICO_SOURCES src/geom_mesh.cpp src/input_gmsh.cpp
             src/output_silo.cpp src/quadratures.cpp src/rwg_basis.cpp
             src/utils.cpp src/sources.cpp src/emw_solver.cpp
             src/emw_postpro_common.cpp
@@ -155,10 +162,16 @@ set(SOURCES src/main.cpp src/geom_mesh.cpp src/input_gmsh.cpp
             src/emw_ana_antenna.cpp
 )
 
-add_executable(frico ${SOURCES})
-target_link_libraries(frico PUBLIC ${LINK_LIBS})
+add_library(frico_lib SHARED ${LIBFRICO_SOURCES})
+set_target_properties(frico_lib PROPERTIES OUTPUT_NAME "frico")
+target_link_libraries(frico_lib PUBLIC ${LINK_LIBS})
 
-install(TARGETS frico
+set(FRICO_SOURCES src/main.cpp)
+add_executable(frico_cmd ${FRICO_SOURCES})
+set_target_properties(frico_cmd PROPERTIES OUTPUT_NAME "frico")
+target_link_libraries(frico_cmd PUBLIC frico_lib ${LINK_LIBS})
+
+install(TARGETS frico_lib frico_cmd
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
@@ -173,6 +186,19 @@ install(DIRECTORY share/examples/
 install(DIRECTORY share/gnuplot/
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/frico
 )
+
+if (BUILD_FRICO_GUI)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTOUIC ON)
+    set(CMAKE_AUTORCC ON)
+
+    add_executable(frico_gui
+        src/gui/main.cpp
+        src/gui/polarwidget.cpp
+    )
+
+    target_link_libraries(frico_gui PRIVATE Qt6::Widgets Qt6::Charts HighFive)
+endif()
 
 ######################################################################
 ## Packaging

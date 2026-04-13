@@ -105,7 +105,8 @@ compute_port_values(const simulation& sim,
 }
 
 static void
-postpro_context(const simulation& sim, size_t ctx_num, antenna_analysis& anta)
+postpro_context(simulation& sim, size_t ctx_num,
+    antenna_analysis& anta, silo& db)
 {
     auto& antdata = anta.antdata[ctx_num];
 
@@ -137,7 +138,14 @@ postpro_context(const simulation& sim, size_t ctx_num, antenna_analysis& anta)
     std::println("Max gain: {:.2f} dB", 10*std::log10(maxG));
     
     /* Fields */
-    //write_fields(sim, ctx_num);
+    if ( db.is_open() ) {
+        std::string dirname = "sweep_step_" + std::to_string(ctx_num);
+        auto old_dir = db.curdir().value();
+        db.mkdir(dirname);
+        db.chdir(dirname);
+        write_fields(sim, ctx_num, db);
+        db.chdir(old_dir);
+    }
 }
 
 static bool
@@ -232,9 +240,22 @@ bool do_sweep(simulation& sim, antenna_analysis& anta)
     auto nctxs = sim.contexts.size();
     anta.antdata.resize(nctxs);
 
+    silo db;
+    if (sim.cfg.silo_outfn) {
+        db.open(sim.cfg.silo_outfn);
+        db.mkdir("meshes");
+        db.chdir("meshes");
+        db.add_mesh("mesh", sim.msh);
+    
+        for (const auto& smp : sim.samplings.planes) {
+            db.add_mesh(smp.name, smp.smpmsh);
+        }
+        db.chdir("/");
+    }
+
     for (size_t ctx_num = 0; ctx_num < nctxs; ctx_num++) {
         run_context(sim, ctx_num, anta.dgap);
-        postpro_context(sim, ctx_num, anta);
+        postpro_context(sim, ctx_num, anta, db);
 
         /* Dump matrices, if needed*/
         if (sim.cfg.dump_matrices) {
@@ -249,13 +270,21 @@ bool do_sweep(simulation& sim, antenna_analysis& anta)
         sim.contexts[ctx_num].Z.resize(0,0);
     }
 
+    /* Write text files with radiation diagrams */
     for (size_t ctx_num = 0; ctx_num < nctxs; ctx_num++) {
         std::string fname = "polar_" + std::to_string(ctx_num) + ".txt";
         write_radiation_diagrams(fname, sim, ctx_num, anta);
     }
 
-    write_hdf5("antenna_analysis.h5", sim, anta);
+    if (sim.cfg.h5_outfn) {
+        write_hdf5(sim.cfg.h5_outfn, sim, anta);
+    }
+
     write_sweep_data("port_sweep.txt", sim, anta);
+
+    if ( db.is_open() ) {
+        db.close();
+    }
 
     return true;
 }
