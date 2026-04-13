@@ -1,5 +1,5 @@
 <!-- Creator     : groff version 1.23.0 -->
-<!-- CreationDate: Fri Mar 13 11:05:11 2026 -->
+<!-- CreationDate: Mon Apr 13 19:39:30 2026 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -24,7 +24,14 @@
 <a href="#SYNOPSIS">SYNOPSIS</a><br>
 <a href="#DESCRIPTION">DESCRIPTION</a><br>
 <a href="#OPTIONS">OPTIONS</a><br>
+<a href="#Always-necessary options">Always-necessary options</a><br>
+<a href="#Analysis type and related parameters">Analysis type and related parameters</a><br>
+<a href="#BEM/MOM tuning">BEM/MOM tuning</a><br>
+<a href="#Postprocessing">Postprocessing</a><br>
+<a href="#Advanced and Debug options">Advanced and Debug options</a><br>
+<a href="#Output options">Output options</a><br>
 <a href="#CAVEATS">CAVEATS</a><br>
+<a href="#USAGE EXAMPLES">USAGE EXAMPLES</a><br>
 <a href="#SEE ALSO">SEE ALSO</a><br>
 <a href="#BUGS">BUGS</a><br>
 <a href="#AUTHOR">AUTHOR</a><br>
@@ -59,10 +66,10 @@ Moments code for the simulation of antennas and scattering
 structures.</p>
 
 <p style="margin-left:9%; margin-top: 1em">This code
-implements the Method of Moments (MoM) as described in
-&quot;NASA Contractor Report 189594&quot; titled &quot;MOM3D
-Method of Moments Code - Theory Manual&quot; by John F.
-Shaeffer.</p>
+implements the Method of Moments (MoM), mostly as described
+in &quot;NASA Contractor Report 189594&quot; titled
+&quot;MOM3D Method of Moments Code - Theory Manual&quot; by
+John F. Shaeffer.</p>
 
 <p style="margin-left:9%; margin-top: 1em">The code takes
 as input a GMSH .geo file and some parameters specifying the
@@ -73,6 +80,97 @@ SILO files for the visualization of fields using VisIt.</p>
 <h2>OPTIONS
 <a name="OPTIONS"></a>
 </h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">Frico has many
+command line options and in the following are grouped
+together in more or less related categories.</p>
+
+<h3>Always-necessary options
+<a name="Always-necessary options"></a>
+</h3>
+
+
+<p style="margin-left:9%; margin-top: 1em"><b>-g
+&lt;path&gt;</b></p>
+
+<p style="margin-left:18%;">Path to the input geometry, it
+must be a GMSH .geo file.</p>
+
+<p style="margin-left:9%;"><b>-f &lt;frequency&gt;</b></p>
+
+<p style="margin-left:18%;">Simulation frequency specified
+in Hz. Exponential notation may be used. Mutually exclusive
+with -R.</p>
+
+<p style="margin-left:9%;"><b>-R
+&lt;start&gt;:&lt;step&gt;:&lt;end&gt;</b></p>
+
+<p style="margin-left:18%;">Do a sweep from &lt;start&gt;
+Hz to &lt;end&gt; Hz at steps of &lt;step&gt; Hz.
+Frequencies may be specified using exponential notation.
+Mutually exclusive with -f.</p>
+
+<h3>Analysis type and related parameters
+<a name="Analysis type and related parameters"></a>
+</h3>
+
+
+<p style="margin-left:9%; margin-top: 1em"><b>-s
+&lt;physgroup&gt;</b></p>
+
+<p style="margin-left:18%;">Perform an antenna analysis by
+placing a unitary delta-gap source on the specified Physical
+Curve. Delta-gap voltage is applied to one or more curves
+that need to be grouped in a physical group of your GMSH
+model. For example, if a delta-gap source on curves 4,5,6
+and 7 is wanted, you need to put in your GMSH model
+something like</p>
+
+<p style="margin-left:23%; margin-top: 1em">Physical
+Curve(&quot;source&quot;, 10) = {4,5,6,7};</p>
+
+<p style="margin-left:9%;"><b>-Z &lt;value&gt;</b></p>
+
+<p style="margin-left:18%;">Set system impedance for SWR
+calculations (default: 50 Ohm)</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="3%">
+
+
+<p><b>-m</b></p></td>
+<td width="6%"></td>
+<td width="55%">
+
+
+<p>Monostatic Radar Cross Section computation.</p></td>
+<td width="27%">
+</td></tr>
+</table>
+
+<p style="margin-left:9%;"><b>-b
+&lt;R&gt;:&lt;theta&gt;&lt;phi&gt;</b></p>
+
+<p style="margin-left:18%;">Perform a bistatic RCS analysis
+of the object positioned in the origin of the coordinate
+axes. The position of the radar is specified by the three
+arguments <b>R</b>, <b>theta</b> and <b>phi</b>. <b>R</b> is
+the distance from the origin in meters, whereas <b>theta</b>
+and <b>phi</b> are the angles in degrees from the pole and
+around the equator (see COORDINATE SYSTEMS). By setting
+angles theta = 0 and phi = 0 the radar lies on the Z axis.
+The radar always transmits in the direction of the origin.
+The output of the analysis is written in the
+&lsquo;bistatic_rcs_N.txt&lsquo; files, where N is the sweep
+point.</p>
+
+<h3>BEM/MOM tuning
+<a name="BEM/MOM tuning"></a>
+</h3>
 
 
 <table width="100%" border="0" rules="none" frame="void"
@@ -90,18 +188,62 @@ SILO files for the visualization of fields using VisIt.</p>
 <p style="margin-top: 1em">Do not use quadratures, use
 approximate matrix as described in the MOM3D theory
 manual.</p> </td></tr>
+</table>
+
+<p style="margin-left:9%;"><b>-k &lt;order&gt;</b></p>
+
+<p style="margin-left:18%;">Integration order to be used
+when not in approximate mode (-A). Default is 1.</p>
+
+<h3>Postprocessing
+<a name="Postprocessing"></a>
+</h3>
+
+
+<p style="margin-left:9%; margin-top: 1em"><b>-P
+&lt;plane&gt;:&lt;width&gt;:&lt;height&gt;:&lt;meshsize&gt;
+<br>
+-P
+&lt;nx&gt;:&lt;ny&gt;:&lt;nz&gt;:&lt;width&gt;:&lt;height&gt;:&lt;meshsize&gt;</b></p>
+
+<p style="margin-left:18%;">Add a plane on which E and H
+fields will be evaluated. The plane can be specified in a
+4-parameters form and in a 6-parameters form, and the -P
+option can be repeated to add multiple planes. The planes
+are rectangles of a certain <b>width</b> and a certain
+<b>height</b> specified in meters. Each plane results in a
+mesh of triangles whose size is controlled via the parameter
+<b>h</b>; the field will be evaluated in the vertices of
+that mesh. In the 4-parameters form the parameter
+<b>plane</b> can assume the values xy, yz and xz, yielding
+an evaluation plane aligned with the specified coordinate
+axes. The 6-parameter form is not usable yet.</p>
+
+<p style="margin-left:9%;"><b>-p
+&lt;name&gt;:&lt;x&gt;:&lt;y&gt;:&lt;z&gt;</b></p>
+
+<p style="margin-left:18%;">Add a field probe (not ready
+yet).</p>
+
+<h3>Advanced and Debug options
+<a name="Advanced and Debug options"></a>
+</h3>
+
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="3%">
 
 
-<p><b>-d</b></p></td>
+<p style="margin-top: 1em"><b>-d</b></p></td>
 <td width="6%"></td>
 <td width="82%">
 
 
-<p>Dump matrices and right hand sides of all the linear
-systems.</p> </td></tr>
+<p style="margin-top: 1em">Dump matrices and right hand
+sides of all the linear systems.</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="3%">
@@ -114,67 +256,6 @@ systems.</p> </td></tr>
 
 <p>Force reorientation of basis functions involved in the
 delta-gap (see CAVEATS).</p></td></tr>
-</table>
-
-<p style="margin-left:9%;"><b>-g &lt;path&gt;</b></p>
-
-<p style="margin-left:18%;">Path to the input geometry as
-.geo file obtained from GMSH.</p>
-
-<p style="margin-left:9%;"><b>-f &lt;frequency&gt;</b></p>
-
-<p style="margin-left:18%;">Simulation frequency specified
-in Hz. Exponential notation may be used. Mutually exclusive
-with -R.</p>
-
-<p style="margin-left:9%;"><b>-s &lt;physgroup&gt;</b></p>
-
-<p style="margin-left:18%;">Currently only antenna
-simulation is supported, therefore only delta-gap sources
-are allowed. Delta-gap voltage is applied to one or more
-curves that need to be grouped in a physical group of your
-GMSH model. For example, if a delta-gap source on curves
-4,5,6 and 7 is wanted, you need to put in your GMSH model
-something like</p>
-
-<p style="margin-left:23%; margin-top: 1em">Physical
-Curve(&quot;source&quot;, 10) = {4,5,6,7};</p>
-
-<p style="margin-left:9%;"><b>-R
-&lt;start&gt;:&lt;step&gt;:&lt;end&gt;</b></p>
-
-<p style="margin-left:18%;">Do a sweep from &lt;start&gt;
-Hz to &lt;end&gt; Hz at steps of &lt;step&gt; Hz.
-Frequencies may be specified using exponential notation.
-Mutually exclusive with -f.</p>
-
-<p style="margin-left:9%;"><b>-k &lt;order&gt;</b></p>
-
-<p style="margin-left:18%;">Integration order to be used
-when not in approximate mode (-A). Default is 1.</p>
-
-<p style="margin-left:9%;"><b>-n &lt;name&gt;</b></p>
-
-<p style="margin-left:18%;">Set a descriptive name for the
-simulation. Default is &quot;default&quot;.</p>
-
-<table width="100%" border="0" rules="none" frame="void"
-       cellspacing="0" cellpadding="0">
-<tr valign="top" align="left">
-<td width="9%"></td>
-<td width="3%">
-
-
-<p><b>-S</b></p></td>
-<td width="6%"></td>
-<td width="82%">
-
-
-<p>Expert stuff: In the current implementation the matrix
-is slightly nonsymmetric (only for non-approximate variant)
-because of the handling of the self elements. This flag
-forces symmetrization by doing 0.5*(Z + Z&#710;T). Do not
-use.</p> </td></tr>
 </table>
 
 <p style="margin-left:9%;"><b>-x &lt;list of
@@ -198,10 +279,62 @@ Mesh 2; <br>
 Delete { Volume{1,2}; } <br>
 Delete { Surface{3}; }</p>
 
-<p style="margin-left:9%;"><b>-Z &lt;value&gt;</b></p>
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="3%">
 
-<p style="margin-left:18%;">Set system impedance for SWR
-calculations (default: 50 Ohm)</p>
+
+<p><b>-S</b></p></td>
+<td width="6%"></td>
+<td width="82%">
+
+
+<p>Expert stuff: In the current implementation the matrix
+is slightly nonsymmetric (only for non-approximate variant)
+because of the handling of the self elements. This flag
+forces symmetrization by doing 0.5*(Z + Z&#710;T). Do not
+use.</p> </td></tr>
+</table>
+
+<h3>Output options
+<a name="Output options"></a>
+</h3>
+
+
+<p style="margin-left:9%; margin-top: 1em"><b>-O
+&lt;filename&gt;</b></p>
+
+<p style="margin-left:18%;">Enable HDF5 output and write
+the fields in the file named <b>filename</b>.</p>
+
+<p style="margin-left:9%;"><b>-o &lt;filename&gt;</b></p>
+
+<p style="margin-left:18%;">Enable Silo output and write
+the fields in the file named <b>filename</b>.</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="3%">
+
+
+<p><b>-t</b></p></td>
+<td width="6%"></td>
+<td width="28%">
+
+
+<p>Enable textual output.</p></td>
+<td width="54%">
+</td></tr>
+</table>
+
+<p style="margin-left:9%;"><b>-n &lt;name&gt;</b></p>
+
+<p style="margin-left:18%;">Set a descriptive name for the
+simulation. Default is &quot;default&quot;.</p>
 
 <h2>CAVEATS
 <a name="CAVEATS"></a>
@@ -290,6 +423,15 @@ issue if you get nonsensical results when using delta-gaps.
 This situation can be easily detected by eye by using the
 &quot;Label&quot; plot in VisIt to inspect the numbering of
 the elements across the delta-gap.</p>
+
+<h2>USAGE EXAMPLES
+<a name="USAGE EXAMPLES"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">In the
+<b>share/examples</b> directory provided in the source tree
+of frico many usage examples are provided.</p>
 
 <h2>SEE ALSO
 <a name="SEE ALSO"></a>
