@@ -266,12 +266,16 @@ silo::add_variable(const std::string& mesh_name,
         return false;
     }
 
-
-    const char *names[] = { var_name.c_str() };
-    std::string def = "{" + vname_x + "," + vname_y + "," + vname_z + "}";
+    std::string dbcurdir = curdir().value();
+    std::string ename = dbcurdir + "/" + var_name;
+    const char *names[] = { ename.c_str() };
+    std::string def =  
+        "{<" + dbcurdir + "/" + vname_x + ">," +
+        "<" + dbcurdir + "/" + vname_y + ">," +
+        "<" + dbcurdir + "/" + vname_z + ">}";
     const char *defs[] = { def.c_str() };
     int types[] = { DB_VARTYPE_VECTOR };
-    std::string defname = var_name + "defs";
+    std::string defname = dbcurdir + var_name + "defs";
     if ( DBPutDefvars(db_, defname.c_str(), 1, names, types, defs, NULL) < 0) {
         return false;
     }
@@ -325,6 +329,38 @@ silo::add_curve(const std::string& name, const std::vector<double>& x,
     DBPutCurve(db_, name.c_str(), x.data(), y.data(),
         DB_DOUBLE, x.size(), nullptr);
     return true;
+}
+
+bool
+silo::mkdir(const std::string& name)
+{
+    if (not db_) {
+        return false;
+    }
+    DBMkDir(db_, name.c_str());
+    return true;
+}
+
+bool
+silo::chdir(const std::string& name)
+{
+    if (not db_) {
+        return false;
+    }
+    DBSetDir(db_, name.c_str());
+    return true;
+}
+
+std::optional<std::string>
+silo::curdir(void) const
+{
+    if (not db_) {
+        return {};
+    }
+
+    char dir[256];
+    DBGetDir(db_, dir);
+    return dir;
 }
 
 silo::~silo()

@@ -1,7 +1,7 @@
 /*
  * FRICO - Friendly Radiation Integral COde
  *
- * Copyright (c) 2025-2026, Matteo Cicuttin - IV3IWE
+ * Copyright (c) 2025,2026 Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
  * Dipartimento di Scienze Matematiche "G. L. Lagrange"
  *
@@ -19,26 +19,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include <QApplication>
 
-#include <expected>
+#include <highfive/highfive.hpp>
 
-#include "eigen.h"
-#include "emw_solver.h"
-#include "utils.h"
-#include "output_silo.h"
+#include "polarwidget.h"
 
-namespace frico::maxwell {
+int main(int argc, char *argv[])
+{
+    HighFive::File file("biquad.h5", HighFive::File::ReadOnly);
 
-std::pair<ezvec3, ezvec3> eval_fields(const simulation&, size_t, const point&);
-void eval_fields(const simulation&, size_t, const mesh&, zdfield&, zdfield&);
-std::complex<double> gamma(std::complex<double>, double);
-double swr(std::complex<double>, double);
-double swr(std::complex<double>);
-bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
-    double r, double h);
-void write_fields(simulation& sim, size_t ctx_number, silo& db);
+    auto dataset = file.getDataSet("/frico/antenna_analysis/0/gain_YZ");
+    auto data = dataset.read<std::vector<double>>();
+    dataset.read(data);
+    
+    QApplication app(argc, argv);
 
+    PolarWidget pw;
+    pw.setWindowTitle("FRICO");
+    pw.resize(500, 500);
+    pw.show();
+    pw.setData(data);
 
-} // namespace frico::maxwell
-
+    return app.exec();
+}

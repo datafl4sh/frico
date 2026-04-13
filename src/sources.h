@@ -31,9 +31,47 @@
 namespace frico {
 
 /**************************************************************/
-struct plane_wave {
-    edvec3 E0_;
-    edvec3 kinc_;
+class plane_wave {
+    using cd = std::complex<double>;
+
+    edvec3  theta_hat;  // Theta unit vector (vertical)
+    edvec3  phi_hat;    // Phi unit vector (horizontal)
+    edvec3  dir;        // OPPOSITE propagation direction
+    cd      Etheta;
+    cd      Ephi;
+
+public:
+    plane_wave(double theta_i, double phi_i, cd Etheta_i, cd Ephi_i)
+    {
+        /* Compute the vector FROM the origin */
+        dir = edvec3 {
+            std::sin(theta_i) * std::cos(phi_i),
+            std::sin(theta_i) * std::sin(phi_i),
+            std::cos(theta_i)
+        };
+
+        /* Theta unit vector: rotating from Z towards XY plane */
+        theta_hat = edvec3 {
+            std::cos(theta_i) * std::cos(phi_i),
+            std::cos(theta_i) * std::sin(phi_i),
+            -std::sin(theta_i)
+        };
+
+        /* Phi unit vector: rotating from X towards YZ plane */
+        phi_hat = edvec3 { -std::sin(phi_i), std::cos(phi_i), 0.0 };
+
+        Etheta = Etheta_i;
+        Ephi = Ephi_i;
+    }
+
+    ezvec3
+    compute(double k, point pos) const
+    {
+        auto jk = std::complex<double>{0.0, k};
+        ezvec3 E0 = Etheta*theta_hat + Ephi*phi_hat;
+        /* Positive exponent: remember that dir is from (0,0,0) to pos */
+        return E0 * std::exp(jk*dir.dot(pos.to_eigen()));  
+    }
 };
 
 /**************************************************************/

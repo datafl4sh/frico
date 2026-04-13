@@ -21,43 +21,11 @@
 
 #pragma once
 
-#include <vector>
-#include <string>
-#include <expected>
-#include <optional>
+#include "emw_solver.h"
+#include "emw_postpro_common.h"
+namespace frico::maxwell {
 
-#include "geom_point.h"
-namespace frico {
+void postpro_context(simulation&, size_t, const plane_wave&);
+void write_file_headers(const simulation&, const plane_wave&);
 
-struct frequency_range {
-    double  start;
-    double  step;
-    double  end;
-};
-
-enum class parse_error {
-    invalid_input,
-    out_of_range,
-};
-
-std::vector<std::string> split(const std::string&, char);
-
-std::expected<frequency_range, parse_error>
-    parse_frequency_range(const std::string&);
-
-std::expected<std::vector<int>, parse_error>
-    parse_integer_list(const std::string&);
-
-std::optional<frico::frequency_range>
-    parse_frequency_parameters(const char *, const char *);
-
-inline point
-sph2rect(double R, double theta, double phi)
-{
-    auto x = R * std::cos(phi) * std::sin(theta);
-    auto y = R * std::sin(phi) * std::sin(theta);
-    auto z = R * std::cos(theta);
-    return {x,y,z};
-}
-
-} // namespace frico
+} // namespace frico::maxwell

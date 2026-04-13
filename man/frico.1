@@ -10,7 +10,7 @@ frico \- Friendly Radiation Integral COde
 A 3D Method of Moments code for the simulation of antennas and scattering
 structures.
 .PP
-This code implements the Method of Moments (MoM) as described in "NASA
+This code implements the Method of Moments (MoM), mostly as described in "NASA
 Contractor Report 189594" titled "MOM3D Method of Moments Code - Theory
 Manual" by John F. Shaeffer.
 .PP
@@ -19,27 +19,36 @@ sources and the simulation frequency. The output is written to text files (for
 impedance and radiation patterns) and SILO files for the visualization of fields
 using VisIt.
 .SH OPTIONS
-.TP
-\fB\-A\fR
-Do not use quadratures, use approximate matrix as described in the MOM3D theory
-manual.
-.TP
-\fB\-d\fR
-Dump matrices and right hand sides of all the linear systems.
-.TP
-\fB\-e\fR
-Force reorientation of basis functions involved in the delta-gap (see CAVEATS).
+Frico has many command line options and in the following are grouped together
+in more or less related categories.
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SS Always-necessary options
+
+.\"%%%
 .TP
 \fB\-g <path>\fR
-Path to the input geometry as .geo file obtained from GMSH.
+Path to the input geometry, it must be a GMSH .geo file.
+
+.\"%%%
 .TP
 \fB\-f <frequency>\fR
 Simulation frequency specified in Hz. Exponential notation may be used. Mutually
 exclusive with -R.
+
+.\"%%%
+.TP
+\fB\-R <start>:<step>:<end>\fR
+Do a sweep from <start> Hz to <end> Hz at steps of <step> Hz. Frequencies may be
+specified using exponential notation. Mutually exclusive with -f.
+
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SS Analysis type and related parameters
+
+.\"%%%
 .TP
 \fB\-s <physgroup>\fR
-Currently only antenna simulation is supported, therefore only delta-gap sources
-are allowed. Delta-gap voltage is applied to one or more curves that need to be
+Perform an antenna analysis by placing a unitary delta-gap source on the specified
+Physical Curve. Delta-gap voltage is applied to one or more curves that need to be
 grouped in a physical group of your GMSH model. For example, if a delta-gap
 source on curves 4,5,6 and 7 is wanted, you need to put in your GMSH model
 something like
@@ -50,21 +59,80 @@ Physical Curve("source", 10) = {4,5,6,7};
 .EE
 .in
 
+.\"%%%
 .TP
-\fB\-R <start>:<step>:<end>\fR
-Do a sweep from <start> Hz to <end> Hz at steps of <step> Hz. Frequencies may be
-specified using exponential notation. Mutually exclusive with -f.
+\fB\-Z <value>\fR
+Set system impedance for SWR calculations (default: 50 Ohm) 
+
+.\"%%%
+.TP
+\fB\-m\fR
+Monostatic Radar Cross Section computation.
+
+.\"%%%
+.TP
+\fB\-b <R>:<theta><phi>\fR
+Perform a bistatic RCS analysis of the object positioned in the origin of the
+coordinate axes. The position of the radar is specified by the three arguments
+\fBR\fR, \fBtheta\fR and \fBphi\fR. \fBR\fR is the distance from the origin in
+meters, whereas \fBtheta\fR and \fBphi\fR are the angles in degrees from the
+pole and around the equator (see COORDINATE SYSTEMS).
+By setting angles theta = 0 and phi = 0 the radar lies on the Z axis. The radar
+always transmits in the direction of the origin. The output of the analysis is
+written in the `bistatic_rcs_N.txt` files, where N is the sweep point.
+
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SS BEM/MOM tuning
+
+.\"%%%
+.TP
+\fB\-A\fR
+Do not use quadratures, use approximate matrix as described in the MOM3D theory
+manual.
+
+.\"%%%
 .TP
 \fB\-k <order>\fR
 Integration order to be used when not in approximate mode (-A). Default is 1.
+
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SS Postprocessing
+
+.\"%%%
 .TP
-\fB\-n <name>\fR
-Set a descriptive name for the simulation. Default is "default".
+\fB\-P <plane>:<width>:<height>:<meshsize>\fR \c
+.br
+\fB\-P <nx>:<ny>:<nz>:<width>:<height>:<meshsize>\fR
+Add a plane on which E and H fields will be evaluated. The plane can be specified
+in a 4-parameters form and in a 6-parameters form, and the -P option can be
+repeated to add multiple planes.
+The planes are rectangles of a certain \fBwidth\fR and a certain \fBheight\fR
+specified in meters. Each plane results in a mesh of triangles whose size
+is controlled via the parameter \fBh\fR; the field will be evaluated in the
+vertices of that mesh.
+In the 4-parameters form the parameter \fBplane\fR can assume the values xy, yz
+and xz, yielding an evaluation plane aligned with the specified coordinate axes.
+The 6-parameter form is not usable yet.
+
+.\"%%%
 .TP
-\fB\-S\fR
-Expert stuff: In the current implementation the matrix is slightly nonsymmetric
-(only for non-approximate variant) because of the handling of the self elements.
-This flag forces symmetrization by doing 0.5*(Z + Z^T). Do not use.
+\fB\-p <name>:<x>:<y>:<z>\fR
+Add a field probe (not ready yet).
+
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SS Advanced and Debug options
+
+.\"%%%
+.TP
+\fB\-d\fR
+Dump matrices and right hand sides of all the linear systems.
+
+.\"%%%
+.TP
+\fB\-e\fR
+Force reorientation of basis functions involved in the delta-gap (see CAVEATS).
+
+.\"%%%
 .TP
 \fB\-x <list of tags>\fR
 List of comma-separated tags corresponding to GMSH surfaces you want to exclude
@@ -85,9 +153,36 @@ Delete { Surface{3}; }
 .EE
 .in
 
+.\"%%%
 .TP
-\fB\-Z <value>\fR
-Set system impedance for SWR calculations (default: 50 Ohm) 
+\fB\-S\fR
+Expert stuff: In the current implementation the matrix is slightly nonsymmetric
+(only for non-approximate variant) because of the handling of the self elements.
+This flag forces symmetrization by doing 0.5*(Z + Z^T). Do not use.
+
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SS Output options
+
+.\"%%%
+.TP
+\fB\-O <filename>\fR
+Enable HDF5 output and write the fields in the file named \fBfilename\fR.
+
+.\"%%%
+.TP
+\fB\-o <filename>\fR
+Enable Silo output and write the fields in the file named \fBfilename\fR.
+
+.\"%%%
+.TP
+\fB\-t\fR
+Enable textual output.
+
+.\"%%%
+.TP
+\fB\-n <name>\fR
+Set a descriptive name for the simulation. Default is "default".
+
 
 .SH CAVEATS
 Delta-gap sources can occasionally give some problems. What happens is the
@@ -122,6 +217,10 @@ your situation.
 Be aware of this issue if you get nonsensical results when using delta-gaps.
 This situation can be easily detected by eye by using the "Label" plot in VisIt
 to inspect the numbering of the elements across the delta-gap.
+
+.SH USAGE EXAMPLES
+In the \fBshare/examples\fR directory provided in the source tree of frico
+many usage examples are provided.
 
 .SH SEE ALSO
 The required theory to understand this code and MoM in general is contained in

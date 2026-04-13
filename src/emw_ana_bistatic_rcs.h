@@ -21,24 +21,27 @@
 
 #pragma once
 
-#include "eigen.h"
-#include "geom_point.h"
+#include <fstream>
+#include "emw_solver.h"
 namespace frico::maxwell {
-struct gain_data {
-    point       center = {0.0, 0.0, 0.0};
-    double      radius = 5;
-    ddvector    Gxy;
-    ddvector    Gyz;
-    ddvector    Gxz;
+
+struct bistatic_rcs_data {
+    std::vector<double>     VV_theta;
+    std::vector<double>     HH_theta;
+    std::vector<double>     VV_phi;
+    std::vector<double>     HH_phi;
 };
 
-struct port_values {
-    std::complex<double>    I = 0.0;    // Current
-    std::complex<double>    Z = 0.0;    // Impedance
-    std::complex<double>    P = 0.0;    // Power
+struct bistatic_rcs_analysis {
+    double          radar_R = 10.0;
+    double          radar_theta = 0.0;
+    double          radar_phi = 0.0;
+    double          Etheta = 1.0;
+    double          Ephi = 1.0;
+    std::vector<bistatic_rcs_data>  rcsdata;
 };
 
-void postpro_context(const simulation&, size_t, const delta_gap&);
-void write_file_headers(const simulation&, const delta_gap&);
+bool init_from_spec(const char *spec, bistatic_rcs_analysis& ana);
+bool do_sweep(simulation& sim, const bistatic_rcs_analysis& ana);
 
-}
+} // namespace frico::maxwell

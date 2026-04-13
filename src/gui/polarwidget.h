@@ -1,7 +1,7 @@
 /*
  * FRICO - Friendly Radiation Integral COde
  *
- * Copyright (c) 2025-2026, Matteo Cicuttin - IV3IWE
+ * Copyright (c) 2025,2026 Matteo Cicuttin - IV3IWE
  * Politecnico di Torino
  * Dipartimento di Scienze Matematiche "G. L. Lagrange"
  *
@@ -21,24 +21,24 @@
 
 #pragma once
 
-#include <expected>
+#include <QtCharts/QChartView>
+#include <QtCharts/QPolarChart>
+#include <QtCharts/QLineSeries>
 
-#include "eigen.h"
-#include "emw_solver.h"
-#include "utils.h"
-#include "output_silo.h"
+#include <vector>
 
-namespace frico::maxwell {
+class PolarWidget : public QChartView
+{
+    Q_OBJECT
 
-std::pair<ezvec3, ezvec3> eval_fields(const simulation&, size_t, const point&);
-void eval_fields(const simulation&, size_t, const mesh&, zdfield&, zdfield&);
-std::complex<double> gamma(std::complex<double>, double);
-double swr(std::complex<double>, double);
-double swr(std::complex<double>);
-bool make_sampling_grid(frico::mesh& msh, const frico::point& c,
-    double r, double h);
-void write_fields(simulation& sim, size_t ctx_number, silo& db);
+public:
+    explicit PolarWidget(QWidget *parent = nullptr);
 
+    void setData(const std::vector<double>& data);
 
-} // namespace frico::maxwell
+private:
+    QPolarChart *m_chart;
+    QLineSeries *m_series;
 
+    void setupAxes();
+};

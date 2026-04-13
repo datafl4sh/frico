@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <fstream>
 #include <print>
 #include <chrono>
 
@@ -32,6 +33,8 @@
 #include "sources.h"
 #include "utils.h"
 #include "lapack_wrappers.h"
+#include "output_silo.h"
+#include "sampling_planes.h"
 
 namespace frico::maxwell {
 
@@ -44,6 +47,8 @@ struct config
     bool            force_reorient_deltagap = false;
     bool            verbose = false;
     double          Z0 = 50.0;
+    const char *    silo_outfn = nullptr;
+    const char *    h5_outfn = nullptr;
 };
 struct freq_context {
     size_t                      ctx_number; // Incremental context number
@@ -56,20 +61,20 @@ struct freq_context {
     zdvector                    tri_AdivJ;
 };
 
-enum class simulation_type {
-    antenna,
-    radar
-};
-
 struct simulation {
     std::string                     name;       // Simulation name
-    simulation_type                 type;       // Type of simulation
     config                          cfg;        // Simulation config
     mesh                            msh;        // Mesh
     std::vector<int>                skiptags;   // Surfaces to skip
     std::vector<rwg_basis_function> bfuncs;     // Basis functions
     std::vector<freq_context>       contexts;   // Data for each frequency
     std::vector<double>             delta_gap_signs;
+    field_samplings                 samplings;  // Requested field samplings
+};
+
+
+struct monostatic_rcs_analysis {
+
 };
 
 bool init_simulation(simulation&, const std::string&,
@@ -160,41 +165,10 @@ bool run_context(simulation& sim, size_t ctx_number, const Source& src)
 }
 
 
-
-
-
-void postpro_context(simulation&, size_t, const plane_wave&);
-void write_file_headers(const simulation&, const plane_wave&);
-
-
 bool init_sweep(simulation&, const frequency_range&);
 
-
-template<typename Source>
-bool do_sweep(simulation& sim, const Source& src)
-{
-    write_file_headers(sim, src);
-    reorient_deltagap_edges(sim, src, sim.delta_gap_signs);
-
-    for (size_t ctx_num = 0; ctx_num < sim.contexts.size(); ctx_num++) {
-        run_context(sim, ctx_num, src);
-        postpro_context(sim, ctx_num, src);
-
-        /* Dump matrices, if needed*/
-        if (sim.cfg.dump_matrices) {
-            const auto& context = sim.contexts[ctx_num];
-            std::string h5fn = "frico_" + std::to_string(ctx_num) + ".h5";
-            H5Easy::File file(h5fn, H5Easy::File::Truncate);
-            file.createDataSet("/frico/Z", context.Z);
-            file.createDataSet("/frico/V", context.V);
-        }
-
-        /* dealloc matrix when we're done */
-        sim.contexts[ctx_num].Z.resize(0,0);
-    }
-    return true;
-}
-
+bool do_sweep(simulation& sim, const delta_gap& src);
+bool do_sweep(simulation& sim, const plane_wave& src);
 
 
 } //namespace frico::maxwell
