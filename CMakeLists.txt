@@ -171,6 +171,10 @@ add_executable(frico_cmd ${FRICO_SOURCES})
 set_target_properties(frico_cmd PROPERTIES OUTPUT_NAME "frico")
 target_link_libraries(frico_cmd PUBLIC frico_lib ${LINK_LIBS})
 
+set(TOPOLOGY_SOURCES src/main_topology.cpp)
+add_executable(topology ${TOPOLOGY_SOURCES})
+target_link_libraries(topology PUBLIC frico_lib ${LINK_LIBS})
+
 install(TARGETS frico_lib frico_cmd
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
