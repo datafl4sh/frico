@@ -176,14 +176,76 @@ Enable Silo output and write the fields in the file named \fBfilename\fR.
 .\"%%%
 .TP
 \fB\-t\fR
-Enable textual output.
+Enable text file output for gain patterns, SWR computations and RCS computations.
 
 .\"%%%
 .TP
 \fB\-n <name>\fR
 Set a descriptive name for the simulation. Default is "default".
 
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SH SILO OUTPUT FORMAT
+The format used by FRICO for data visualization is Silo and to visualize data
+you need to use VisIt. Inside the Silo file, data is organized in subfolders.
+The computational mesh is stored under "/meshes/mesh", while the field evaluation
+meshes are stored under "/meshes/plane_<N>".
 
+Current fields can be visualized as scalars or vectors using the appropriate
+variables. All the fields are stored in the SILO file classified first by sweep
+step, then by field type and finally by field name. In particular, under
+"sweep_step_<N>/surf_fields" there are the current fields on the surfaces of the
+object under study, whereas in the "sweep_step_<M>/plane_<N>" folders there are
+the electric and magnetic field in air.
+
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SH HDF5 OUTPUT FORMAT
+The format used by FRICO to output data like antenna patterns, impedances and RCS
+is HDF5. HDF5 files are organized in folders rooted under "/frico" and each analysis
+type uses its own folder structure as described below.
+
+HDF5 files can be explored using the "h5view" tool and some examples to access
+them from Matlab/Octave can be found in the "share" directory included in the
+source tree.
+
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+.SS Antenna analysis output
+
+.\"%%%
+.TP
+\fB/frico/antenna_analysis/sweep_steps\fR:
+This dataset consists in a single integer containing the number of steps of a frequency sweep.
+
+.\"%%%
+.TP
+\fB/frico/antenna_analysis/Z0\fR:
+This dataset consists in a single real containing the impedance value used for SWR computations.
+
+.\"%%%
+.TP
+\fB/frico/antenna_analysis/rdiag_dist\fR:
+This dataset consists in a single real containing the distance (in meters) used for the
+computation of the radiation diagrams.
+
+.\"%%%
+.TP
+\fB/frico/antenna_analysis/<N>/frequency\fR:
+This dataset contains the frequency in Hz of the Nth sweep step.
+
+.\"%%%
+.TP
+\fB/frico/antenna_analysis/<N>/gain_PP\fR:
+This dataset contains the antenna gain on the PP plane computed for the Nth
+sweep step, where PP can be XY, XZ or YZ. Gain values are in dB and listed from
+0 degrees to 359 degrees at steps of 1 degree.
+
+.\"%%%
+.TP
+\fB/frico/antenna_analysis/<N>/<port_param>\fR:
+This dataset contains various parameters related to the excitation port as
+the current (current), the reflection coefficient (gamma), the impedance (impedance),
+the power (power), the SWR (swr) and the voltage (voltage).
+
+.\"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 .SH CAVEATS
 Delta-gap sources can occasionally give some problems. What happens is the
 following:

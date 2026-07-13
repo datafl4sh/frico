@@ -260,27 +260,32 @@ bool do_sweep(simulation& sim, antenna_analysis& anta)
         /* Dump matrices, if needed*/
         if (sim.cfg.dump_matrices) {
             const auto& context = sim.contexts[ctx_num];
-            std::string h5fn = "frico_" + std::to_string(ctx_num) + ".h5";
+            std::string h5fn = "frico_linear_system_" + std::to_string(ctx_num) + ".h5";
             H5Easy::File file(h5fn, H5Easy::File::Truncate);
             file.createDataSet("/frico/Z", context.Z);
             file.createDataSet("/frico/V", context.V);
+            file.createDataSet("/frico/I", context.I);
         }
 
         /* dealloc matrix when we're done */
         sim.contexts[ctx_num].Z.resize(0,0);
     }
 
-    /* Write text files with radiation diagrams */
-    for (size_t ctx_num = 0; ctx_num < nctxs; ctx_num++) {
-        std::string fname = "polar_" + std::to_string(ctx_num) + ".txt";
-        write_radiation_diagrams(fname, sim, ctx_num, anta);
+    if (sim.cfg.write_text_outfiles) {
+        /* Write text files with radiation diagrams */
+        for (size_t ctx_num = 0; ctx_num < nctxs; ctx_num++) {
+            std::string fname = "polar_" + std::to_string(ctx_num) + ".txt";
+            write_radiation_diagrams(fname, sim, ctx_num, anta);
+        }
+
+        /* Write text file with computed port parameters */
+        write_sweep_data("port_sweep.txt", sim, anta);
     }
 
     if (sim.cfg.h5_outfn) {
         write_hdf5(sim.cfg.h5_outfn, sim, anta);
     }
 
-    write_sweep_data("port_sweep.txt", sim, anta);
 
     if ( db.is_open() ) {
         db.close();

@@ -116,6 +116,7 @@ int main(int argc, char **argv)
             sim.cfg.force_symmetry = true;
             break;
         case 't':
+            sim.cfg.write_text_outfiles = true;
             break;
         case 'v':
             sim.cfg.verbose = true;

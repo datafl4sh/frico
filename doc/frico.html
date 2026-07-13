@@ -1,5 +1,5 @@
 <!-- Creator     : groff version 1.23.0 -->
-<!-- CreationDate: Mon Apr 13 19:39:30 2026 -->
+<!-- CreationDate: Mon Jul 13 18:00:49 2026 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
 "http://www.w3.org/TR/html4/loose.dtd">
 <html>
@@ -30,6 +30,9 @@
 <a href="#Postprocessing">Postprocessing</a><br>
 <a href="#Advanced and Debug options">Advanced and Debug options</a><br>
 <a href="#Output options">Output options</a><br>
+<a href="#SILO OUTPUT FORMAT">SILO OUTPUT FORMAT</a><br>
+<a href="#HDF5 OUTPUT FORMAT">HDF5 OUTPUT FORMAT</a><br>
+<a href="#Antenna analysis output">Antenna analysis output</a><br>
 <a href="#CAVEATS">CAVEATS</a><br>
 <a href="#USAGE EXAMPLES">USAGE EXAMPLES</a><br>
 <a href="#SEE ALSO">SEE ALSO</a><br>
@@ -323,18 +326,108 @@ the fields in the file named <b>filename</b>.</p>
 
 <p><b>-t</b></p></td>
 <td width="6%"></td>
-<td width="28%">
+<td width="82%">
 
 
-<p>Enable textual output.</p></td>
-<td width="54%">
-</td></tr>
+<p>Enable text file output for gain patterns, SWR
+computations and RCS computations.</p></td></tr>
 </table>
 
 <p style="margin-left:9%;"><b>-n &lt;name&gt;</b></p>
 
 <p style="margin-left:18%;">Set a descriptive name for the
 simulation. Default is &quot;default&quot;.</p>
+
+<h2>SILO OUTPUT FORMAT
+<a name="SILO OUTPUT FORMAT"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">The format used
+by FRICO for data visualization is Silo and to visualize
+data you need to use VisIt. Inside the Silo file, data is
+organized in subfolders. The computational mesh is stored
+under &quot;/meshes/mesh&quot;, while the field evaluation
+meshes are stored under
+&quot;/meshes/plane_&lt;N&gt;&quot;.</p>
+
+<p style="margin-left:9%; margin-top: 1em">Current fields
+can be visualized as scalars or vectors using the
+appropriate variables. All the fields are stored in the SILO
+file classified first by sweep step, then by field type and
+finally by field name. In particular, under
+&quot;sweep_step_&lt;N&gt;/surf_fields&quot; there are the
+current fields on the surfaces of the object under study,
+whereas in the
+&quot;sweep_step_&lt;M&gt;/plane_&lt;N&gt;&quot; folders
+there are the electric and magnetic field in air.</p>
+
+<h2>HDF5 OUTPUT FORMAT
+<a name="HDF5 OUTPUT FORMAT"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">The format used
+by FRICO to output data like antenna patterns, impedances
+and RCS is HDF5. HDF5 files are organized in folders rooted
+under &quot;/frico&quot; and each analysis type uses its own
+folder structure as described below.</p>
+
+<p style="margin-left:9%; margin-top: 1em">HDF5 files can
+be explored using the &quot;h5view&quot; tool and some
+examples to access them from Matlab/Octave can be found in
+the &quot;share&quot; directory included in the source
+tree.</p>
+
+<h3>Antenna analysis output
+<a name="Antenna analysis output"></a>
+</h3>
+
+
+
+<p style="margin-left:9%; margin-top: 1em"><b>/frico/antenna_analysis/sweep_steps</b>:</p>
+
+<p style="margin-left:18%;">This dataset consists in a
+single integer containing the number of steps of a frequency
+sweep.</p>
+
+
+<p style="margin-left:9%;"><b>/frico/antenna_analysis/Z0</b>:</p>
+
+<p style="margin-left:18%;">This dataset consists in a
+single real containing the impedance value used for SWR
+computations.</p>
+
+
+<p style="margin-left:9%;"><b>/frico/antenna_analysis/rdiag_dist</b>:</p>
+
+<p style="margin-left:18%;">This dataset consists in a
+single real containing the distance (in meters) used for the
+computation of the radiation diagrams.</p>
+
+
+<p style="margin-left:9%;"><b>/frico/antenna_analysis/&lt;N&gt;/frequency</b>:</p>
+
+<p style="margin-left:18%;">This dataset contains the
+frequency in Hz of the Nth sweep step.</p>
+
+
+<p style="margin-left:9%;"><b>/frico/antenna_analysis/&lt;N&gt;/gain_PP</b>:</p>
+
+<p style="margin-left:18%;">This dataset contains the
+antenna gain on the PP plane computed for the Nth sweep
+step, where PP can be XY, XZ or YZ. Gain values are in dB
+and listed from 0 degrees to 359 degrees at steps of 1
+degree.</p>
+
+
+<p style="margin-left:9%;"><b>/frico/antenna_analysis/&lt;N&gt;/&lt;port_param&gt;</b>:</p>
+
+<p style="margin-left:18%;">This dataset contains various
+parameters related to the excitation port as the current
+(current), the reflection coefficient (gamma), the impedance
+(impedance), the power (power), the SWR (swr) and the
+voltage (voltage).</p>
 
 <h2>CAVEATS
 <a name="CAVEATS"></a>

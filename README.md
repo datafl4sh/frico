@@ -65,4 +65,4 @@ In `share/examples` you can find some usage examples of FRICO. Given that FRICO 
 
 ## Closing remarks
 
-This software is proudly Friulian-made by IV3IWE, so that's the real reason of its name. For more Friulian-flavoured software you can also take a look to [MUSET](https://github.com/rvicedomini/muset).
+This software is proudly Friulian-made by Matteo Cicuttin IV3IWE, so if you know that place you can guess the reason of its name. For more Friulian-flavoured software you can also take a look to [MUSET](https://github.com/rvicedomini/muset).

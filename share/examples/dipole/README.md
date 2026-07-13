@@ -8,12 +8,12 @@ The dipole is modeled as a rectangular strip, as FRICO does not support thin wir
 
 In order to run a frequency sweep from 250 MHz to 350 MHz at steps of 10 MHz you can launch
 
-    frico -g dipole.geo -R 250e6:10e6:350e6 -A -s src
+    frico -g dipole.geo -R 250e6:10e6:350e6 -A -s src -t -o dipole.silo
 
 This will produce, as explained in the example for the biquad antenna:
 
-* 11 `default_N.silo` files with the fields at the different frequencies
-* 11 `polar_N.txt` files with the gain data at the different frequencies
+* `dipole.silo` file with the fields at the different frequencies
+* `polar_N.txt` files with the gain data at the different frequencies
 * the file `port_sweep.txt` with the impedance data at the input port
 
 ## Comparison with NEC

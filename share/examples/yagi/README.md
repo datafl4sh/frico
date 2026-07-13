@@ -8,12 +8,12 @@ The antenna elements are modeled as rectangular strips, as FRICO does not suppor
 
 In order to run a frequency sweep from 280 MHz to 320 MHz at steps of 1 MHz you can launch
 
-    frico -g yagi.geo -R 280e6:1e6:320e6 -A -s src
+    frico -g yagi.geo -R 280e6:1e6:320e6 -A -s src -t -o yagi.silo
 
 This will produce, as explained in the example for the biquad antenna:
 
-* 41 `default_N.silo` files with the fields at the different frequencies
-* 41 `polar_N.txt` files with the gain data at the different frequencies
+* `yagi.silo` file with the fields at the different frequencies
+* `polar_N.txt` files with the gain data at the different frequencies
 * the file `port_sweep.txt` with the impedance data at the input port
 
 ## Comparison with NEC

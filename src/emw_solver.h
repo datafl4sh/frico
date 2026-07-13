@@ -49,7 +49,9 @@ struct config
     double          Z0 = 50.0;
     const char *    silo_outfn = nullptr;
     const char *    h5_outfn = nullptr;
+    bool            write_text_outfiles = false;
 };
+
 struct freq_context {
     size_t                      ctx_number; // Incremental context number
     double                      frequency;  // Frequency
